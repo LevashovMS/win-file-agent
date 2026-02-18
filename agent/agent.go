@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"mediamagi.ru/win-file-agent/config"
 	"mediamagi.ru/win-file-agent/server"
 	"mediamagi.ru/win-file-agent/server/controllers"
 	"mediamagi.ru/win-file-agent/store"
@@ -21,7 +22,7 @@ func New(ctx context.Context) *Agent {
 	var taskController = controllers.NewTask(store, w)
 	// обычный запуск
 	var s = server.New(
-		server.Port(8080),
+		server.Port(config.Config.Port),
 		server.Handler(http.MethodGet, "/v1/task/{id}", taskController.Get),
 		server.Handler(http.MethodGet, "/v1/task", taskController.GetAll),
 		server.Handler(http.MethodPost, "/v1/task", taskController.Create),

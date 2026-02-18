@@ -3,17 +3,22 @@ package worker
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"mediamagi.ru/win-file-agent/config"
 	"mediamagi.ru/win-file-agent/store"
 )
 
 type Worker struct {
 	cancel       context.CancelFunc
+	count        int
 	wg           sync.WaitGroup // воркер‑пул
 	taskQueue    chan *Task
 	store        store.Store[string, *Task]
@@ -21,7 +26,16 @@ type Worker struct {
 }
 
 func New(store store.Store[string, *Task]) *Worker {
+	var workerCount = config.Config.WorkerCount
+	if workerCount < 1 {
+		workerCount = 4
+	}
+	if workerCount > 50 {
+		workerCount = 16
+	}
+
 	return &Worker{
+		count:     workerCount,
 		taskQueue: make(chan *Task),
 		store:     store,
 	}
@@ -31,8 +45,10 @@ func New(store store.Store[string, *Task]) *Worker {
 func (c *Worker) Run(ctx context.Context) error {
 	ctx, c.cancel = context.WithCancel(ctx)
 	// Запускаем воркер‑пул
-	c.wg.Add(1)
-	go c.workerLoop(ctx)
+	for range c.count {
+		c.wg.Add(1)
+		go c.workerLoop(ctx)
+	}
 
 	return nil
 }
@@ -60,7 +76,7 @@ func (c *Worker) Stop() {
 	})
 }
 
-func (c *Worker) RunProc(t *Task) {
+func (c *Worker) ExecTask(t *Task) {
 	c.store.Store(t.ID, t)
 	c.taskQueue <- t
 }
@@ -83,41 +99,90 @@ func (c *Worker) workerLoop(ctx context.Context) {
 			// Ожидаем завершения текущей задачи (если нужно)
 			return
 		case task := <-c.taskQueue:
-			c.executeTask(ctx, task)
+			if err := c.downloadFiles(ctx, task); err != nil {
+				log.Printf("Task %s downloadFiles error: %v", task.ID, err)
+				c.setState(task.ID, ERROR, err)
+				return
+			}
+			if err := c.executeTask(ctx, task); err != nil {
+				log.Printf("Task %s executeTask error: %v", task.ID, err)
+				c.setState(task.ID, ERROR, err)
+				return
+			}
+
+			log.Printf("Task %s finished successfully", task.ID)
+			c.setState(task.ID, FINISH)
 		}
 	}
 }
 
-func (c *Worker) executeTask(ctx context.Context, task *Task) {
-	// создаём exec.Cmd
-	// пример: ffmpeg -i input.mp4 -c:v libx264 -b:v 500k -c:a copy output.mp4
-	cmd := exec.CommandContext(ctx, task.Cmd, task.Args...)
-	// настройка
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
+	c.setState(task.ID, DOWNLOAD)
+	for idx, urlStr := range task.Urls {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	// сохраняем в map для последующего kill
-	c.store.Store(task.ID, task)
+		var fileName = fmt.Sprintf("%s_%d", task.ID, idx)
+		// 1. Get the data from the URL
+		resp, err := http.Get(urlStr)
+		if err != nil {
+			return err
+		}
+		// Ensure the response body is closed after the function returns
+		defer resp.Body.Close()
+
+		var filepath = filepath.Join(task.InDir, fileName)
+		// 2. Create the local file
+		out, err := os.Create(filepath)
+		if err != nil {
+			return err
+		}
+		// Ensure the file is closed after the function returns
+		defer out.Close()
+
+		// 3. Stream the response body to the file
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			return err
+		}
+		task.Files = append(task.Files, fileName)
+
+		log.Printf("Task %s Downloaded file to %s\n", task.ID, filepath)
+	}
+	return nil
+}
+
+func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 	c.setState(task.ID, PROCESS)
+	for range task.Files {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	// запускаем
-	if err := cmd.Start(); err != nil {
-		log.Printf("Task %s start error: %v", task.ID, err)
-		c.setState(task.ID, ERROR, err)
-		return
+		// пример: ffmpeg -i input.mp4 -c:v libx264 -b:v 500k -c:a copy output.mp4
+		cmd := exec.CommandContext(ctx, task.Cmd, task.Args...)
+		// настройка
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		// запускаем
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+
+		// ждём завершения
+		if err := cmd.Wait(); err != nil {
+			return err
+		}
+		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, task.Args)
 	}
 
-	// ждём завершения в отдельной горутине
-	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			log.Printf("Task %s finished with error: %v", task.ID, err)
-			c.setState(task.ID, ERROR, err)
-		} else {
-			log.Printf("Task %s finished successfully", task.ID)
-			c.setState(task.ID, FINISH)
-		}
-	}()
+	return nil
 }
 
 func (c *Worker) stopAllChildProcesses() {

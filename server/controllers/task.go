@@ -52,7 +52,7 @@ func (c *Task) Create(req *http.Request) (any, error) {
 		return nil, err
 	}
 	var tw = t.To()
-	c.w.RunProc(tw)
+	c.w.ExecTask(tw)
 
 	return tw.ID, server.StatusCode(http.StatusCreated)
 }

@@ -23,7 +23,7 @@ func (c *TaskReq) To() *worker.Task {
 		ID:     c.GetID(),
 		InDir:  c.InDir,
 		OutDir: c.OutDir,
-		Files:  c.Files,
+		Urls:   c.Files,
 		Cmd:    c.Cmd,
 		Args:   c.Args,
 	}

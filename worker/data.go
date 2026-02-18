@@ -18,6 +18,7 @@ type Task struct {
 	ID     string
 	InDir  string
 	OutDir string
+	Urls   []string
 	Files  []string
 	Cmd    string
 	Args   []string
