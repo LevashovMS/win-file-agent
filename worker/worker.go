@@ -15,11 +15,11 @@ type Worker struct {
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup // воркер‑пул
 	taskQueue    chan *Task
-	store        store.Store[any, any]
+	store        store.Store[string, *Task]
 	shutdownOnce sync.Once
 }
 
-func New(store store.Store[any, any]) *Worker {
+func New(store store.Store[string, *Task]) *Worker {
 	return &Worker{
 		taskQueue: make(chan *Task),
 		store:     store,
@@ -64,7 +64,7 @@ func (c *Worker) RunProc(t *Task) {
 	c.taskQueue <- t
 }
 
-func (c *Worker) StopProc(key any) (bool, error) {
+func (c *Worker) StopProc(key string) (bool, error) {
 	var v, ok = c.store.Load(key)
 	if !ok {
 		return ok, nil
@@ -89,6 +89,7 @@ func (c *Worker) workerLoop(ctx context.Context) {
 
 func (c *Worker) executeTask(ctx context.Context, task *Task) {
 	// создаём exec.Cmd
+	// пример: ffmpeg -i input.mp4 -c:v libx264 -b:v 500k -c:a copy output.mp4
 	cmd := exec.CommandContext(ctx, task.Cmd, task.Args...)
 	// настройка
 	cmd.Stdout = os.Stdout
@@ -122,8 +123,7 @@ func (c *Worker) stopAllChildProcesses() {
 	c.store.Range(c.stopProc)
 }
 
-func (c *Worker) stopProc(key any, value any) bool {
-	var task = value.(*Task)
+func (c *Worker) stopProc(key string, task *Task) bool {
 	var cmd = task.cmd
 	// 1) Если процесс уже завершён – skip
 	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
@@ -133,17 +133,16 @@ func (c *Worker) stopProc(key any, value any) bool {
 	// 2) Отправляем graceful‑kill (Ctrl+C) – но для cmd.exe/PowerShell это не всегда работает.
 	// Лучше сразу kill
 	if err := cmd.Process.Kill(); err != nil {
-		log.Printf("Failed to kill child %d: %v", key, err)
+		log.Printf("Failed to kill child %s: %v", key, err)
 	} else {
-		log.Printf("Killed child %d", key)
+		log.Printf("Killed child %s", key)
 	}
 
 	return true
 }
 
 func (c *Worker) setState(id string, state StateCode) {
-	var v, _ = c.store.Load(id)
-	var task = v.(*Task)
-	task.State = state
-	c.store.Store(id, task)
+	if task, ok := c.store.Load(id); ok {
+		task.State = state
+	}
 }

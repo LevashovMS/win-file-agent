@@ -12,10 +12,10 @@ import (
 
 type Task struct {
 	w     *worker.Worker
-	store store.Store[any, any]
+	store store.Store[string, *worker.Task]
 }
 
-func NewTask(store store.Store[any, any], w *worker.Worker) *Task {
+func NewTask(store store.Store[string, *worker.Task], w *worker.Worker) *Task {
 	return &Task{
 		store: store,
 		w:     w,

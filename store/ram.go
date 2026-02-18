@@ -1,44 +1,50 @@
 package store
 
-import "sync"
+import (
+	"maps"
+	"slices"
+	"sync"
+)
 
-type Store[K, V any] interface {
-	Store(key K, value V)
-	Range(f func(key K, value V) bool)
-	Delete(key K)
-	Load(key K) (value V, ok bool)
-	GetKeys() []V
+type ram[K comparable, V any] struct {
+	lock sync.RWMutex
+	data map[K]V
 }
 
-type ram struct {
-	childProcs sync.Map // map[taskID]*exec.Cmd
+func NewRam[K comparable, V any]() Store[K, V] {
+	return &ram[K, V]{data: make(map[K]V)}
 }
 
-func NewRam() Store[any, any] {
-	return &ram{}
+func (c *ram[K, V]) Store(key K, value V) {
+	c.lock.Lock()
+	c.data[key] = value
+	c.lock.Unlock()
 }
 
-func (c *ram) Store(key any, value any) {
-	c.childProcs.Store(key, value)
+func (c *ram[K, V]) Delete(key K) {
+	c.lock.Lock()
+	delete(c.data, key)
+	c.lock.Unlock()
 }
 
-func (c *ram) Delete(key any) {
-	c.childProcs.Delete(key)
+func (c *ram[K, V]) Range(f func(key K, value V) bool) {
+	c.lock.RLock()
+	for k, v := range c.data {
+		f(k, v)
+	}
+	c.lock.RUnlock()
 }
 
-func (c *ram) Range(f func(key, value any) bool) {
-	c.childProcs.Range(f)
+func (c *ram[K, V]) Load(key K) (value V, ok bool) {
+	c.lock.RLock()
+	value, ok = c.data[key]
+	c.lock.RUnlock()
+	return
 }
 
-func (c *ram) Load(key any) (value any, ok bool) {
-	return c.childProcs.Load(key)
-}
-
-func (c *ram) GetKeys() []any {
-	var keys = make([]any, 0)
-	c.childProcs.Range(func(key, value any) bool {
-		keys = append(keys, key)
-		return true
-	})
+func (c *ram[K, V]) GetKeys() []K {
+	c.lock.RLock()
+	var keys = slices.Collect(maps.Keys(c.data))
+	c.lock.RUnlock()
 	return keys
 }

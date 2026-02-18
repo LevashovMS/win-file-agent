@@ -16,7 +16,7 @@ type Agent struct {
 }
 
 func New() *Agent {
-	var store = store.NewRam()
+	var store = store.NewRam[string, *worker.Task]()
 	var w = worker.New(store)
 	var taskController = controllers.NewTask(store, w)
 	// обычный запуск
