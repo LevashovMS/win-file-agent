@@ -38,7 +38,15 @@ func (c *server) Run(ctx context.Context) (err error) {
 	c.ctx, c.cf = context.WithCancel(ctx)
 	var addrPort = fmt.Sprintf(":%d", c.port)
 	// 1) Запускаем HTTP‑сервер
-	c.srv = &http.Server{Addr: addrPort, Handler: c.router.mux}
+	c.srv = &http.Server{
+		Addr:              addrPort,
+		Handler:           c.router.mux,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second, // Maximum time to read request headers
+
+	}
 	go func() {
 		err = c.srv.ListenAndServe()
 	}()

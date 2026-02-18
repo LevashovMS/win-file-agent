@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
+	"log"
 
 	"mediamagi.ru/win-file-agent/worker"
 )
@@ -34,7 +35,10 @@ func (c *TaskReq) GetID() string {
 	//return fmt.Sprintf("%d", time.Now().Unix())
 
 	var b bytes.Buffer
-	gob.NewEncoder(&b).Encode(c)
+	if err := gob.NewEncoder(&b).Encode(c); err != nil {
+		log.Printf("Обшибка создания ID, %+v", err)
+		return ""
+	}
 
 	var hash = sha256.New()
 	hash.Write(b.Bytes())
