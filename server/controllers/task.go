@@ -44,16 +44,17 @@ func (c *Task) Create(req *http.Request) (any, error) {
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		//http.Error(w, "can't read body", http.StatusBadRequest)
-		return nil, err
+		return nil, server.StatusCode(http.StatusBadRequest)
 	}
 
 	var t = new(TaskReq)
 	if err = json.Unmarshal(bodyBytes, t); err != nil {
 		return nil, err
 	}
-	c.w.RunProc(t.To())
+	var tw = t.To()
+	c.w.RunProc(tw)
 
-	return nil, server.StatusCode(http.StatusCreated)
+	return tw.ID, server.StatusCode(http.StatusCreated)
 }
 
 func (c *Task) Delete(req *http.Request) (any, error) {

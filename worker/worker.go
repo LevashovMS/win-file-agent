@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -102,7 +103,7 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) {
 	// запускаем
 	if err := cmd.Start(); err != nil {
 		log.Printf("Task %s start error: %v", task.ID, err)
-		c.setState(task.ID, ERROR)
+		c.setState(task.ID, ERROR, err)
 		return
 	}
 
@@ -111,10 +112,10 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) {
 		err := cmd.Wait()
 		if err != nil {
 			log.Printf("Task %s finished with error: %v", task.ID, err)
-			c.setState(task.ID, ERROR)
+			c.setState(task.ID, ERROR, err)
 		} else {
 			log.Printf("Task %s finished successfully", task.ID)
-			c.store.Delete(task.ID)
+			c.setState(task.ID, FINISH)
 		}
 	}()
 }
@@ -124,6 +125,10 @@ func (c *Worker) stopAllChildProcesses() {
 }
 
 func (c *Worker) stopProc(key string, task *Task) bool {
+	if task.State == ERROR || task.State == FINISH {
+		return true
+	}
+
 	var cmd = task.cmd
 	// 1) Если процесс уже завершён – skip
 	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
@@ -141,8 +146,15 @@ func (c *Worker) stopProc(key string, task *Task) bool {
 	return true
 }
 
-func (c *Worker) setState(id string, state StateCode) {
+func (c *Worker) setState(id string, state StateCode, errs ...error) {
 	if task, ok := c.store.Load(id); ok {
 		task.State = state
+		if state == ERROR {
+			task.Msg = fmt.Sprintf("%v", errs)
+			c.store.SetTimeout(id, time.Now().Add(2*time.Minute))
+		}
+		if state == FINISH {
+			c.store.SetTimeout(id, time.Now().Add(2*time.Minute))
+		}
 	}
 }

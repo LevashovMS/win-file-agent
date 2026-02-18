@@ -22,6 +22,7 @@ type Task struct {
 	Cmd    string
 	Args   []string
 	State  StateCode
+	Msg    string
 
 	cmd *exec.Cmd
 }

@@ -13,11 +13,18 @@ import (
 )
 
 type AgentWindows struct {
-	a *Agent
+	ctx context.Context
+	cf  context.CancelFunc
+	a   *Agent
 }
 
 func NewAgentWindows() *AgentWindows {
-	return &AgentWindows{a: New()}
+	var ctx, cf = context.WithCancel(context.Background())
+	return &AgentWindows{
+		ctx: ctx,
+		cf:  cf,
+		a:   New(ctx),
+	}
 }
 
 func (a *AgentWindows) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (svcSpecificEC bool, exitCode uint32) {
@@ -51,7 +58,7 @@ loop:
 			case svc.Continue:
 				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 				tick = fasttick
-				a.a.Start(context.Background())
+				a.a.Start(a.ctx)
 			default:
 			}
 		}

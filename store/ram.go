@@ -1,18 +1,28 @@
 package store
 
 import (
+	"context"
+	"log"
 	"maps"
 	"slices"
 	"sync"
+	"time"
 )
 
 type ram[K comparable, V any] struct {
-	lock sync.RWMutex
-	data map[K]V
+	lock   sync.RWMutex
+	data   map[K]V
+	timers map[K]*time.Timer
 }
 
-func NewRam[K comparable, V any]() Store[K, V] {
-	return &ram[K, V]{data: make(map[K]V)}
+func NewRam[K comparable, V any](ctx context.Context) Store[K, V] {
+	var r = &ram[K, V]{
+		data:   make(map[K]V),
+		timers: make(map[K]*time.Timer),
+	}
+	go r.timersStop(ctx)
+
+	return r
 }
 
 func (c *ram[K, V]) Store(key K, value V) {
@@ -47,4 +57,40 @@ func (c *ram[K, V]) GetKeys() []K {
 	var keys = slices.Collect(maps.Keys(c.data))
 	c.lock.RUnlock()
 	return keys
+}
+
+func (c *ram[K, V]) SetTimeout(key K, t time.Time) {
+	var dur = time.Until(t)
+	c.lock.Lock()
+	var _, ok = c.data[key]
+	if ok {
+		c.timers[key] = time.AfterFunc(dur, func() {
+			c.handler(key)
+		})
+	}
+	c.lock.Unlock()
+}
+
+func (c *ram[K, V]) timersStop(ctx context.Context) {
+	<-ctx.Done()
+	c.lock.Lock()
+	for key, v := range c.timers {
+		log.Printf("Timer stop: %v\n", key)
+		v.Stop()
+	}
+	c.data = make(map[K]V)
+	c.timers = make(map[K]*time.Timer)
+	c.lock.Unlock()
+
+}
+
+func (c *ram[K, V]) handler(key K) {
+	log.Printf("Ожидание завершено по ключу: %v\n", key)
+	c.lock.Lock()
+	var _, ok = c.data[key]
+	if ok {
+		delete(c.data, key)
+		delete(c.timers, key)
+	}
+	c.lock.Unlock()
 }

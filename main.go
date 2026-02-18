@@ -15,7 +15,7 @@ func main() {
 	var ctx, cf = context.WithCancel(context.Background())
 	defer cf()
 
-	var ag = agent.New()
+	var ag = agent.New(ctx)
 	if err := ag.Start(ctx); err != nil {
 		panic(err)
 	}
