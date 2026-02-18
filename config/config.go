@@ -18,7 +18,7 @@ func init() {
 	for _, fileName := range []string{"config.json", "config/config.json"} {
 		file, err := os.Open(fileName)
 		if err != nil {
-			log.Printf("Ошибка открытия файла: %v\n", err)
+			//log.Printf("Ошибка открытия файла: %v\n", err)
 			continue
 		}
 		defer file.Close()

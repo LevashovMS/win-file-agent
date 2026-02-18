@@ -15,12 +15,12 @@ import (
 )
 
 type TaskReq struct {
-	InDir  string
-	OutDir string
-	Urls   []string
-	Cmd    string
-	Args   []string
-	OutExt string
+	InDir  string   `json:"in_dir"`
+	OutDir string   `json:"out_dir"`
+	Urls   []string `json:"urls"`
+	Cmd    string   `json:"cmd"`
+	Args   []string `json:"args"`
+	OutExt string   `json:"out_ext"`
 }
 
 func (c *TaskReq) To() *worker.Task {

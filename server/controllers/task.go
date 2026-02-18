@@ -56,6 +56,10 @@ func (c *Task) Create(req *http.Request) (any, error) {
 	}
 
 	var tw = t.To()
+	if _, ok := c.store.Load(tw.ID); ok {
+		return nil, server.StatusCode(http.StatusConflict)
+	}
+
 	c.w.ExecTask(tw)
 
 	return tw.ID, server.StatusCode(http.StatusCreated)
