@@ -155,17 +155,39 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 	return nil
 }
 
+const (
+	INPUT  = "{input}"
+	OUTPUT = "{output}"
+)
+
 func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 	c.setState(task.ID, PROCESS)
-	for range task.Files {
+	for _, fileName := range task.Files {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
+		var args = make([]string, len(task.Args))
+		for idx, it := range task.Args {
+			if it == INPUT {
+				var filePath = filepath.Join(task.InDir, fileName)
+				args[idx] = filePath
+				continue
+			}
+			if it == OUTPUT {
+				var filePath = filepath.Join(task.OutDir, fileName)
+				args[idx] = filePath + task.OutExt
+				continue
+			}
+
+			args[idx] = task.Args[idx]
+		}
+		fmt.Printf("args: %v\n", args)
+
 		// пример: ffmpeg -i input.mp4 -c:v libx264 -b:v 500k -c:a copy output.mp4
-		cmd := exec.CommandContext(ctx, task.Cmd, task.Args...)
+		cmd := exec.CommandContext(ctx, task.Cmd, args...)
 		// настройка
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -179,7 +201,7 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 		if err := cmd.Wait(); err != nil {
 			return err
 		}
-		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, task.Args)
+		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
 	}
 
 	return nil

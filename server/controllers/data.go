@@ -5,7 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"log"
+	"net/url"
+	"strings"
 
 	"mediamagi.ru/win-file-agent/worker"
 )
@@ -13,9 +17,10 @@ import (
 type TaskReq struct {
 	InDir  string
 	OutDir string
-	Files  []string
+	Urls   []string
 	Cmd    string
 	Args   []string
+	OutExt string
 }
 
 func (c *TaskReq) To() *worker.Task {
@@ -23,10 +28,47 @@ func (c *TaskReq) To() *worker.Task {
 		ID:     c.GetID(),
 		InDir:  c.InDir,
 		OutDir: c.OutDir,
-		Urls:   c.Files,
+		Urls:   c.Urls,
 		Cmd:    c.Cmd,
 		Args:   c.Args,
+		OutExt: c.OutExt,
 	}
+}
+
+func (c *TaskReq) Verification() error {
+	var msg []string
+	if len(c.InDir) == 0 {
+		msg = append(msg, "Не задана входящая папка")
+	}
+	if len(c.OutDir) == 0 {
+		msg = append(msg, "Не задана исходящая папка")
+	}
+	if len(c.Urls) == 0 {
+		msg = append(msg, "Не задан(ы) файлы для скачивания")
+	}
+	for _, rawURL := range c.Urls {
+		u, err := url.ParseRequestURI(rawURL)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			msg = append(msg, fmt.Sprintf("Некорректный URL: %s", rawURL))
+		}
+	}
+	if len(c.Cmd) == 0 {
+		msg = append(msg, "Не задана команда запуска")
+	}
+	// TODO точно надо проверять?
+	if len(c.Args) == 0 {
+		msg = append(msg, "Не задан(ы) аргументы для команды")
+	}
+
+	if len(msg) > 0 {
+		return errors.New(strings.Join(msg, " "))
+	}
+
+	if len(c.OutExt) > 0 && c.OutExt[0] != '.' {
+		c.OutExt = "." + c.OutExt
+	}
+
+	return nil
 }
 
 // Если делать hash то можно отслеживать, что несколько раз кидают одинаковые команды

@@ -15,15 +15,18 @@ const (
 )
 
 type Task struct {
-	ID     string
+	ID string
+	// request
 	InDir  string
 	OutDir string
 	Urls   []string
-	Files  []string
 	Cmd    string
 	Args   []string
-	State  StateCode
-	Msg    string
+	OutExt string
+	// processing
+	Files []string
+	State StateCode
+	Msg   string
 
 	cmd *exec.Cmd
 }

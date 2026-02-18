@@ -32,3 +32,40 @@ func TestUrls(t *testing.T) {
 	time.Sleep(time.Second)
 	fmt.Printf("task: %+v\n", task)
 }
+
+func TestExec(t *testing.T) {
+	var ctx, cf = context.WithCancel(context.TODO())
+	defer cf()
+	var store = store.NewRam[string, *Task](ctx)
+	var w = New(store)
+
+	//ffmpeg -i /home/max/Загрузки/tmp/big-buck-bunny-1080p-30sec.mp4 -c:v libx264 -b:v 500k -c:a copy /home/max/Загрузки/tmp_out/output.mp4
+	var task = &Task{
+		ID:     "111",
+		InDir:  "/home/max/Загрузки/tmp",
+		OutDir: "/home/max/Загрузки/tmp_out",
+		Cmd:    "ffmpeg",
+		Args: []string{
+			"-i",
+			"{input}",
+			"-c:v",
+			"libx264",
+			"-b:v",
+			"500k",
+			"-c:a",
+			"copy",
+			"{output}",
+		},
+		Files:  []string{"111_0"},
+		OutExt: "mp4",
+	}
+	go func() {
+		var err = w.executeTask(ctx, task)
+		fmt.Printf("err: %+v\n", err)
+	}()
+
+	time.Sleep(2 * time.Second)
+	cf()
+	time.Sleep(time.Second)
+	fmt.Printf("task: %+v\n", task)
+}
