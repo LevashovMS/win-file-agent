@@ -8,10 +8,13 @@ import (
 	"os"
 	"os/signal"
 
+	log "mediamagi.ru/win-file-agent/1log"
 	"mediamagi.ru/win-file-agent/agent"
 )
 
 func main() {
+	defer log.FileClose()
+
 	var ctx, cf = context.WithCancel(context.Background())
 	defer cf()
 
