@@ -19,6 +19,7 @@ import (
 type Worker struct {
 	cancel       context.CancelFunc
 	count        int
+	queue        int
 	wg           sync.WaitGroup // воркер‑пул
 	taskQueue    chan *Task
 	store        store.Store[string, *Task]
@@ -33,10 +34,14 @@ func New(store store.Store[string, *Task]) *Worker {
 	if workerCount > 50 {
 		workerCount = 16
 	}
+	var workerQueue = config.Config.WorkerQueue
+	if workerQueue < 1 {
+		workerQueue = 10
+	}
 
 	return &Worker{
 		count:     workerCount,
-		taskQueue: make(chan *Task),
+		taskQueue: make(chan *Task, workerQueue),
 		store:     store,
 	}
 }
@@ -102,12 +107,12 @@ func (c *Worker) workerLoop(ctx context.Context) {
 			if err := c.downloadFiles(ctx, task); err != nil {
 				log.Printf("Task %s downloadFiles error: %v", task.ID, err)
 				c.setState(task.ID, ERROR, err)
-				return
+				continue
 			}
 			if err := c.executeTask(ctx, task); err != nil {
 				log.Printf("Task %s executeTask error: %v", task.ID, err)
 				c.setState(task.ID, ERROR, err)
-				return
+				continue
 			}
 
 			log.Printf("Task %s finished successfully", task.ID)
@@ -212,7 +217,7 @@ func (c *Worker) stopAllChildProcesses() {
 }
 
 func (c *Worker) stopProc(key string, task *Task) bool {
-	if task.State == ERROR || task.State == FINISH {
+	if task.State != PROCESS {
 		return true
 	}
 
@@ -238,10 +243,10 @@ func (c *Worker) setState(id string, state StateCode, errs ...error) {
 		task.State = state
 		if state == ERROR {
 			task.Msg = fmt.Sprintf("%v", errs)
-			c.store.SetTimeout(id, time.Now().Add(2*time.Minute))
+			c.store.SetTimeout(id, time.Now().Add(time.Minute))
 		}
 		if state == FINISH {
-			c.store.SetTimeout(id, time.Now().Add(2*time.Minute))
+			c.store.SetTimeout(id, time.Now().Add(time.Minute))
 		}
 	}
 }

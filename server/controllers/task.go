@@ -22,10 +22,12 @@ func NewTask(store store.Store[string, *worker.Task], w *worker.Worker) *Task {
 	}
 }
 
+// Get, "/v1/task" - получение списка ключей всех заданий в работе
 func (c *Task) GetAll(req *http.Request) (any, error) {
 	return c.store.GetKeys(), nil
 }
 
+// Get, "/v1/task/{id}" - получение задание и его статус.
 func (c *Task) Get(req *http.Request) (any, error) {
 	var id = req.PathValue("id")
 	if len(id) == 0 {
@@ -39,6 +41,7 @@ func (c *Task) Get(req *http.Request) (any, error) {
 	return nil, nil
 }
 
+// Post, "/v1/task" - создание задания на обработку.
 func (c *Task) Create(req *http.Request) (any, error) {
 	defer req.Body.Close()
 	bodyBytes, err := io.ReadAll(req.Body)
@@ -65,6 +68,7 @@ func (c *Task) Create(req *http.Request) (any, error) {
 	return tw.ID, server.StatusCode(http.StatusCreated)
 }
 
+// Delete, "/v1/task/{id}" отмена задания. {id}
 func (c *Task) Delete(req *http.Request) (any, error) {
 	var id = req.PathValue("id")
 	if len(id) == 0 {

@@ -12,6 +12,7 @@ var Config cfg
 type cfg struct {
 	Port        int `json:"port"`
 	WorkerCount int `json:"worker_count"`
+	WorkerQueue int `json:"worker_queue"`
 }
 
 func init() {

@@ -1,4 +1,5 @@
 {
   "port": 8080,
-  "worker_count": 4
+  "worker_count": 1,
+  "worker_queue": 1
 }

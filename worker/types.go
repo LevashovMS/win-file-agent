@@ -15,18 +15,18 @@ const (
 )
 
 type Task struct {
-	ID string
+	ID string `json:"id"`
 	// request
-	InDir  string
-	OutDir string
-	Urls   []string
-	Cmd    string
-	Args   []string
-	OutExt string
+	InDir  string   `json:"in_dir"`
+	OutDir string   `json:"out_dir"`
+	Urls   []string `json:"urls"`
+	Cmd    string   `json:"cmd"`
+	Args   []string `json:"args"`
+	OutExt string   `json:"out_ext"`
 	// processing
-	Files []string
-	State StateCode
-	Msg   string
+	Files []string  `json:"files"`
+	State StateCode `json:"state"`
+	Msg   string    `json:"msg"`
 
 	cmd *exec.Cmd
 }

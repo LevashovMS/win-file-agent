@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"mediamagi.ru/win-file-agent/worker"
 )
 
 func TestTypes(t *testing.T) {
@@ -21,6 +23,12 @@ func TestTypes(t *testing.T) {
 		OutExt: "mp4",
 	}
 	dataToJson(data)
+
+	var data2 = data.To()
+	data2.Files = []string{""}
+	data2.State = worker.CREATE
+	data2.Msg = "msg"
+	dataToJson(data2)
 }
 
 func typeToJson[T any]() {
