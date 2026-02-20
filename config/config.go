@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"log"
 )
@@ -15,9 +16,14 @@ type cfg struct {
 	WorkerQueue int `json:"worker_queue"`
 }
 
-func init() {
+func Init() {
 	for _, fileName := range []string{"config.json", "config/config.json"} {
-		file, err := os.Open(fileName)
+		execPath, err := os.Executable()
+		if err != nil {
+			log.Fatal("Could not find executable path:", err)
+		}
+		logFilePath := filepath.Join(filepath.Dir(execPath), fileName)
+		file, err := os.Open(logFilePath)
 		if err != nil {
 			//log.Printf("Ошибка открытия файла: %v\n", err)
 			continue

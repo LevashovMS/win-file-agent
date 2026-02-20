@@ -8,15 +8,16 @@ import (
 	"os"
 	"os/signal"
 
-	log "mediamagi.ru/win-file-agent/1log"
 	"mediamagi.ru/win-file-agent/agent"
+	"mediamagi.ru/win-file-agent/config"
+	log1 "mediamagi.ru/win-file-agent/log"
 )
 
 func main() {
-	defer log.FileClose()
-
 	var ctx, cf = context.WithCancel(context.Background())
 	defer cf()
+	log1.Init(ctx)
+	config.Init()
 
 	var ag = agent.New(ctx)
 	if err := ag.Start(ctx); err != nil {

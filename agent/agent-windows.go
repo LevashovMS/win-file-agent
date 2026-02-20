@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"mediamagi.ru/win-file-agent/config"
+	log1 "mediamagi.ru/win-file-agent/log"
+
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
@@ -27,6 +30,8 @@ type agentWindows struct {
 
 func NewAgentWindows(name string) *agentWindows {
 	var ctx, cf = context.WithCancel(context.Background())
+	log1.Init(ctx)
+	config.Init()
 	return &agentWindows{
 		ctx:  ctx,
 		cf:   cf,
