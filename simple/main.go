@@ -7,8 +7,13 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		var buffer, err = os.ReadFile("test.mp4")
+	http.HandleFunc("/{name}", func(w http.ResponseWriter, r *http.Request) {
+		var fileName = r.PathValue("name")
+		if len(fileName) == 0 {
+			return
+		}
+
+		var buffer, err = os.ReadFile(fileName)
 		if err != nil {
 			fmt.Println("Error file read:", err)
 			return

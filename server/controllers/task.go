@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"mediamagi.ru/win-file-agent/disk"
 	"mediamagi.ru/win-file-agent/server"
 	"mediamagi.ru/win-file-agent/store"
 	"mediamagi.ru/win-file-agent/worker"
@@ -56,6 +57,14 @@ func (c *Task) Create(req *http.Request) (any, error) {
 	}
 	if err = t.Verification(); err != nil {
 		return nil, err
+	}
+
+	fs, err := disk.GetFreeSpace(t.InDir)
+	if err != nil {
+		return nil, err
+	}
+	if fs < oneGB {
+		return nil, server.StatusCode(http.StatusInsufficientStorage)
 	}
 
 	var tw = t.To()

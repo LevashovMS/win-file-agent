@@ -14,6 +14,8 @@ import (
 	"mediamagi.ru/win-file-agent/worker"
 )
 
+const oneGB uint64 = 1000 * 1000 * 1000
+
 type TaskReq struct {
 	InDir  string   `json:"in_dir"`
 	OutDir string   `json:"out_dir"`
@@ -25,7 +27,7 @@ type TaskReq struct {
 
 func (c *TaskReq) To() *worker.Task {
 	return &worker.Task{
-		ID:     c.GetID(),
+		ID:     c.getID(),
 		InDir:  c.InDir,
 		OutDir: c.OutDir,
 		Urls:   c.Urls,
@@ -73,7 +75,7 @@ func (c *TaskReq) Verification() error {
 
 // Если делать hash то можно отслеживать, что несколько раз кидают одинаковые команды
 // если команда уже в работе, то выдавать ошибку.
-func (c *TaskReq) GetID() string {
+func (c *TaskReq) getID() string {
 	//return fmt.Sprintf("%d", time.Now().Unix())
 
 	var b bytes.Buffer

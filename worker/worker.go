@@ -160,13 +160,16 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 	return nil
 }
 
-const (
-	INPUT  = "{input}"
-	OUTPUT = "{output}"
-)
-
 func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 	c.setState(task.ID, PROCESS)
+	defer func() {
+		// удаляем файлы
+		for _, fileName := range task.Files {
+			var filePath = filepath.Join(task.InDir, fileName)
+			os.Remove(filePath)
+		}
+	}()
+
 	for _, fileName := range task.Files {
 		select {
 		case <-ctx.Done():
@@ -201,11 +204,14 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 		if err := cmd.Start(); err != nil {
 			return err
 		}
-
 		// ждём завершения
 		if err := cmd.Wait(); err != nil {
 			return err
 		}
+		// удаляем файл (при ошибке файл останется: полезно для понимания ошибки или не нужно?)
+		//var filePath = filepath.Join(task.InDir, fileName)
+		//os.Remove(filePath)
+
 		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
 	}
 

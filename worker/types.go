@@ -2,6 +2,11 @@ package worker
 
 import "os/exec"
 
+const (
+	INPUT  = "{input}"
+	OUTPUT = "{output}"
+)
+
 type StateCode int8
 
 const (
