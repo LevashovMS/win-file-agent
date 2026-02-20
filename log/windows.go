@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package log
 
 import (
@@ -19,7 +22,7 @@ func Init(ctx context.Context) {
 		log.Fatal(err)
 	}
 
-	mw := io.MultiWriter(os.Stdout, file) // Writes to both stdout and file
+	mw := io.MultiWriter(file) // Writes to both stdout and file
 	log.SetOutput(mw)
 
 	// Ждем завершения контекста
