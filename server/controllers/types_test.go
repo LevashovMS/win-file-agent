@@ -12,19 +12,24 @@ func TestTypes(t *testing.T) {
 	typeToJson[TaskReq]()
 
 	var data = &TaskReq{
-		InDir:  "in",
-		OutDir: "out",
-		Urls:   []string{""},
-		Cmd:    "cmd",
+		InDir: "in",
+		//OutDir: "out",
+		Urls: []string{""},
+		Cmd:  "cmd",
 		Args: []string{
 			"{input}",
 			"{output}",
 		},
 		OutExt: "mp4",
+		Ftp: &worker.Ftp{
+			Addr:  "addr",
+			Login: "login",
+			Pass:  "pass",
+		},
 	}
 	dataToJson(data)
 
-	var data2 = data.To()
+	var data2 = data.ToWTask()
 	data2.Files = []string{""}
 	data2.State = worker.CREATE
 	data2.Msg = "msg"

@@ -12,17 +12,10 @@ import (
 var Cfg atomic.Pointer[cfg]
 
 type cfg struct {
-	Port        int `json:"port"`
-	WorkerCount int `json:"worker_count"`
-	WorkerQueue int `json:"worker_queue"`
-	Ftp         *ftp
-}
-
-type ftp struct {
-	TmpDir string `json:"tmp_dir"`
-	Addr   string `json:"addr"`
-	Login  string `json:"login"`
-	Pass   string `json:"pass"`
+	Port        int    `json:"port"`
+	WorkerCount int    `json:"worker_count"`
+	WorkerQueue int    `json:"worker_queue"`
+	TmpDir      string `json:"tmp_dir"`
 }
 
 func Init() {

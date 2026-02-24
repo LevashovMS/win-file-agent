@@ -2,10 +2,5 @@
   "port": 8080,
   "worker_count": 10,
   "worker_queue": 100,
-  "ftp": {
-    "tmp_dir": "",
-    "addr": "",
-    "login": "",
-    "pass": ""
-  }
+  "tmp_dir": ""
 }

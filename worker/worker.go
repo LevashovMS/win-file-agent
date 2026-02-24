@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"mediamagi.ru/win-file-agent/config"
+	"mediamagi.ru/win-file-agent/ftp"
 	"mediamagi.ru/win-file-agent/store"
 )
 
@@ -111,6 +112,10 @@ func (c *Worker) workerLoop(ctx context.Context) {
 					for _, fileName := range task.Files {
 						var filePath = filepath.Join(task.InDir, fileName)
 						os.Remove(filePath)
+						if task.saveToFtp {
+							filePath = filepath.Join(task.GetOutDir(), fileName)
+							os.Remove(filePath)
+						}
 					}
 				}()
 
@@ -121,6 +126,11 @@ func (c *Worker) workerLoop(ctx context.Context) {
 				}
 				if err := c.executeTask(ctx, task); err != nil {
 					log.Printf("Task %s executeTask error: %v", task.ID, err)
+					c.setState(task.ID, ERROR, err)
+					return
+				}
+				if err := c.ftpStore(ctx, task); err != nil {
+					log.Printf("Task %s ftpStore error: %v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
@@ -189,7 +199,7 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 				continue
 			}
 			if it == OUTPUT {
-				var filePath = filepath.Join(task.OutDir, fileName)
+				var filePath = filepath.Join(task.GetOutDir(), fileName)
 				args[idx] = filePath + task.OutExt
 				continue
 			}
@@ -212,13 +222,57 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 		if err := cmd.Wait(); err != nil {
 			return fmt.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
 		}
-		// удаляем файл (при ошибке файл останется: полезно для понимания ошибки или не нужно?)
-		//var filePath = filepath.Join(task.InDir, fileName)
-		//os.Remove(filePath)
 
 		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
 	}
 
+	return nil
+}
+
+func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
+	c.setState(task.ID, SAVING)
+	if !task.saveToFtp {
+		return nil
+	}
+
+	ftpClient, err := ftp.Dial(task.Ftp.Addr)
+	if err != nil {
+		return fmt.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.Ftp.Addr)
+	}
+	defer func() {
+		if err := ftpClient.Quit(); err != nil {
+			log.Printf("ftpClient.Quit() err: %+v\n", err)
+		}
+	}()
+
+	err = ftpClient.Login(task.Ftp.Login, task.Ftp.Pass)
+	if err != nil {
+		return fmt.Errorf("ftpClient.Login Task %s err %+v Login %s Pass %s", task.ID, err, task.Ftp.Login, task.Ftp.Pass)
+	}
+
+	for _, fileName := range task.Files {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		err = func() error {
+			var filePath = filepath.Join(task.GetOutDir(), fileName)
+			file, err := os.Open(filePath)
+			if err != nil {
+				return fmt.Errorf("os.Open Task %s err %+v filePath %s", task.ID, err, filePath)
+			}
+			defer file.Close()
+
+			err = ftpClient.Stor(fileName, file)
+			if err != nil {
+				return fmt.Errorf("ftpClient.Stor Task %s err %+v fileName %s filePath %s", task.ID, err, fileName, filePath)
+			}
+
+			return nil
+		}()
+	}
 	return nil
 }
 

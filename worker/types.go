@@ -1,6 +1,10 @@
 package worker
 
-import "os/exec"
+import (
+	"os/exec"
+
+	"mediamagi.ru/win-file-agent/config"
+)
 
 const (
 	INPUT  = "{input}"
@@ -49,10 +53,29 @@ type Task struct {
 	Cmd    string   `json:"cmd"`
 	Args   []string `json:"args"`
 	OutExt string   `json:"out_ext"`
+	Ftp    *Ftp     `json:"ftp"`
 	// processing
 	Files []string  `json:"files"`
 	State StateCode `json:"state"`
 	Msg   string    `json:"msg"`
 
-	cmd *exec.Cmd
+	cmd       *exec.Cmd
+	saveToFtp bool
+}
+
+func (c *Task) SaveToFtp() {
+	c.saveToFtp = true
+}
+
+func (c *Task) GetOutDir() string {
+	if len(c.OutDir) != 0 {
+		return c.OutDir
+	}
+	return config.Cfg.Load().TmpDir
+}
+
+type Ftp struct {
+	Addr  string `json:"addr"`
+	Login string `json:"login"`
+	Pass  string `json:"pass"`
 }
