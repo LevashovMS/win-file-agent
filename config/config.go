@@ -44,3 +44,22 @@ func Init() {
 		return
 	}
 }
+
+func InitWithPath(logFilePath string) {
+	file, err := os.Open(logFilePath)
+	if err != nil {
+		//log.Printf("Ошибка открытия файла: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	var _cfg = new(cfg)
+	if err := decoder.Decode(_cfg); err != nil {
+		log.Printf("Ошибка декодирования: %v\n", err)
+		return
+	}
+
+	Cfg.Store(_cfg)
+	log.Printf("Загружен конфиг: %+v\n", *_cfg)
+}

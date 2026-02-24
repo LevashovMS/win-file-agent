@@ -111,10 +111,17 @@ func (c *Worker) workerLoop(ctx context.Context) {
 					// удаляем файлы
 					for _, fileName := range task.Files {
 						var filePath = filepath.Join(task.InDir, fileName)
-						os.Remove(filePath)
+						if err := os.Remove(filePath); err != nil {
+							log.Printf("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
+						}
+						log.Printf("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
 						if task.saveToFtp {
-							filePath = filepath.Join(task.GetOutDir(), fileName)
-							os.Remove(filePath)
+							filePath = task.GetOutPath(fileName)
+							if err := os.Remove(filePath); err != nil {
+								log.Printf("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
+							} else {
+								log.Printf("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
+							}
 						}
 					}
 				}()
@@ -199,8 +206,7 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 				continue
 			}
 			if it == OUTPUT {
-				var filePath = filepath.Join(task.GetOutDir(), fileName)
-				args[idx] = filePath + task.OutExt
+				args[idx] = task.GetOutPath(fileName)
 				continue
 			}
 
@@ -235,9 +241,9 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 		return nil
 	}
 
-	ftpClient, err := ftp.Dial(task.Ftp.Addr, ftp.DialWithContext(ctx))
+	ftpClient, err := ftp.Dial(task.ftp.Addr, ftp.DialWithContext(ctx))
 	if err != nil {
-		return fmt.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.Ftp.Addr)
+		return fmt.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.ftp.Addr)
 	}
 	defer func() {
 		if err := ftpClient.Quit(); err != nil {
@@ -245,9 +251,9 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 		}
 	}()
 
-	err = ftpClient.Login(task.Ftp.Login, task.Ftp.Pass)
+	err = ftpClient.Login(task.ftp.Login, task.ftp.Pass)
 	if err != nil {
-		return fmt.Errorf("ftpClient.Login Task %s err %+v Login %s Pass %s", task.ID, err, task.Ftp.Login, task.Ftp.Pass)
+		return fmt.Errorf("ftpClient.Login Task %s err %+v Login %s Pass %s", task.ID, err, task.ftp.Login, task.ftp.Pass)
 	}
 
 	for _, fileName := range task.Files {
@@ -258,7 +264,7 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 		}
 
 		err = func() error {
-			var filePath = filepath.Join(task.GetOutDir(), fileName)
+			var filePath = task.GetOutPath(fileName)
 			file, err := os.Open(filePath)
 			if err != nil {
 				return fmt.Errorf("os.Open Task %s err %+v filePath %s", task.ID, err, filePath)
@@ -270,8 +276,12 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 				return fmt.Errorf("ftpClient.Stor Task %s err %+v fileName %s filePath %s", task.ID, err, fileName, filePath)
 			}
 
+			log.Printf("Task %s ftpStore successfully, filePath %s\n", task.ID, filePath)
 			return nil
 		}()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

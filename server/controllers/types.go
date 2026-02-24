@@ -26,7 +26,7 @@ type TaskReq struct {
 	OutExt string      `json:"out_ext"`
 	Ftp    *worker.Ftp `json:"ftp"`
 
-	isSaveToFtp bool
+	isSaveToFtp bool `json:"-"`
 }
 
 func (c *TaskReq) ToWTask() *worker.Task {
@@ -38,10 +38,9 @@ func (c *TaskReq) ToWTask() *worker.Task {
 		Cmd:    c.Cmd,
 		Args:   c.Args,
 		OutExt: c.OutExt,
-		Ftp:    c.Ftp,
 	}
 	if c.isSaveToFtp {
-		t.SaveToFtp()
+		t.SaveToFtp(c.Ftp)
 	}
 
 	return t
