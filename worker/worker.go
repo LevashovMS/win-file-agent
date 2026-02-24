@@ -105,19 +105,29 @@ func (c *Worker) workerLoop(ctx context.Context) {
 			// Ожидаем завершения текущей задачи (если нужно)
 			return
 		case task := <-c.taskQueue:
-			if err := c.downloadFiles(ctx, task); err != nil {
-				log.Printf("Task %s downloadFiles error: %v", task.ID, err)
-				c.setState(task.ID, ERROR, err)
-				continue
-			}
-			if err := c.executeTask(ctx, task); err != nil {
-				log.Printf("Task %s executeTask error: %v", task.ID, err)
-				c.setState(task.ID, ERROR, err)
-				continue
-			}
+			func() {
+				defer func() {
+					// удаляем файлы
+					for _, fileName := range task.Files {
+						var filePath = filepath.Join(task.InDir, fileName)
+						os.Remove(filePath)
+					}
+				}()
 
-			log.Printf("Task %s finished successfully", task.ID)
-			c.setState(task.ID, FINISH)
+				if err := c.downloadFiles(ctx, task); err != nil {
+					log.Printf("Task %s downloadFiles error: %v", task.ID, err)
+					c.setState(task.ID, ERROR, err)
+					return
+				}
+				if err := c.executeTask(ctx, task); err != nil {
+					log.Printf("Task %s executeTask error: %v", task.ID, err)
+					c.setState(task.ID, ERROR, err)
+					return
+				}
+
+				log.Printf("Task %s finished successfully", task.ID)
+				c.setState(task.ID, FINISH)
+			}()
 		}
 	}
 }
@@ -163,13 +173,6 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 
 func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 	c.setState(task.ID, PROCESS)
-	defer func() {
-		// удаляем файлы
-		for _, fileName := range task.Files {
-			var filePath = filepath.Join(task.InDir, fileName)
-			os.Remove(filePath)
-		}
-	}()
 
 	for _, fileName := range task.Files {
 		select {
