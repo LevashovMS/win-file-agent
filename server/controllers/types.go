@@ -37,7 +37,7 @@ func (c *TaskReq) To() *worker.Task {
 	}
 }
 
-func (c *TaskReq) Verification() error {
+func (c *TaskReq) verification() error {
 	var msg []string
 	if len(c.InDir) == 0 {
 		msg = append(msg, "Не задана входящая папка")

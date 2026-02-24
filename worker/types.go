@@ -19,6 +19,27 @@ const (
 	ERROR StateCode = 127
 )
 
+func (c StateCode) String() string {
+	switch c {
+	case CREATE:
+		return "CREATE"
+	case DOWNLOAD:
+		return "DOWNLOAD"
+	case PROCESS:
+		return "PROCESS"
+	case SAVING:
+		return "SAVING"
+	case CANCEL:
+		return "CANCEL"
+	case FINISH:
+		return "FINISH"
+	case ERROR:
+		return "ERROR"
+	default:
+	}
+	return ""
+}
+
 type Task struct {
 	ID string `json:"id"`
 	// request

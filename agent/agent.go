@@ -17,12 +17,13 @@ type Agent struct {
 }
 
 func New(ctx context.Context) *Agent {
+	var cfg = config.Cfg.Load()
 	var store = store.NewRam[string, *worker.Task](ctx)
 	var w = worker.New(store)
 	var taskController = controllers.NewTask(store, w)
 	// обычный запуск
 	var s = server.New(
-		server.Port(config.Config.Port),
+		server.Port(cfg.Port),
 		server.Handler(http.MethodGet, "/v1/task/{id}", taskController.Get),
 		server.Handler(http.MethodGet, "/v1/task", taskController.GetAll),
 		server.Handler(http.MethodPost, "/v1/task", taskController.Create),

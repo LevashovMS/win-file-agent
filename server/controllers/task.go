@@ -55,7 +55,7 @@ func (c *Task) Create(req *http.Request) (any, error) {
 	if err = json.Unmarshal(bodyBytes, t); err != nil {
 		return nil, err
 	}
-	if err = t.Verification(); err != nil {
+	if err = t.verification(); err != nil {
 		return nil, err
 	}
 

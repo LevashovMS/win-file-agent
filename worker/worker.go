@@ -27,14 +27,15 @@ type Worker struct {
 }
 
 func New(store store.Store[string, *Task]) *Worker {
-	var workerCount = config.Config.WorkerCount
+	var cfg = config.Cfg.Load()
+	var workerCount = cfg.WorkerCount
 	if workerCount < 1 {
 		workerCount = 4
 	}
 	if workerCount > 50 {
 		workerCount = 16
 	}
-	var workerQueue = config.Config.WorkerQueue
+	var workerQueue = cfg.WorkerQueue
 	if workerQueue < 1 {
 		workerQueue = 10
 	}
