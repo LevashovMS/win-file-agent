@@ -5,19 +5,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"sync"
+	"time"
 
 	"mediamagi.ru/win-file-agent/server/controllers"
 	"mediamagi.ru/win-file-agent/worker"
 )
 
 func TestRun(ctx context.Context, params *Params) {
+	log.Printf("Test params: %+v\n", *params)
+
 	var wg sync.WaitGroup
 	// кол-во задач в параллель + гоурутина с файлами
 	wg.Add(params.TaskCount + 1)
@@ -50,7 +53,7 @@ func TestRun(ctx context.Context, params *Params) {
 
 				taskID, err := postTask(params, *reqData)
 				if err != nil {
-					log.Printf("postTask err: %+v\n", err)
+					log.Printf("postTask err: %+v Task: %+v\n", err, *reqData)
 					continue
 				}
 
@@ -64,7 +67,7 @@ func TestRun(ctx context.Context, params *Params) {
 
 					task, err := getTask(params, taskID)
 					if err != nil {
-						log.Printf("getTask err: %+v\n", err)
+						log.Printf("getTask err: %+v Task: %s\n", err, taskID)
 						break
 					}
 
@@ -72,12 +75,14 @@ func TestRun(ctx context.Context, params *Params) {
 						// log
 						taskState = task.State
 						if taskState == worker.ERROR || taskState == worker.FINISH {
-							log.Printf("stop ping Task: %+v\n", *task)
+							log.Printf("STOP PING Task: %+v\n", *task)
 							break
 						}
 
 						log.Printf("NEW STATE Task: %+v\n", *task)
 					}
+
+					time.Sleep(time.Second)
 				}
 			}
 		}()
@@ -147,7 +152,7 @@ func postTask(params *Params, reqData controllers.TaskReq) (string, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
-		return "", err
+		return "", fmt.Errorf("url: %s, StatusCode: %d, taskJson: %s", urlL, res.StatusCode, reqData)
 	}
 
 	buffer, err = io.ReadAll(res.Body)
@@ -157,9 +162,9 @@ func postTask(params *Params, reqData controllers.TaskReq) (string, error) {
 
 	var taskID string
 	if err := json.Unmarshal(buffer, &taskID); err != nil {
-		log.Printf("url: %s, taskID %s, taskJson: %s\n", urlL, taskID, string(buffer))
-		return "", err
+		return "", fmt.Errorf("url: %s, taskID %s, taskJson: %s, err: %+v", urlL, taskID, string(buffer), err)
 	}
+	log.Printf("CREATE TaskID: %s, json %+v\n", taskID, reqData)
 
 	return taskID, nil
 }
@@ -182,8 +187,7 @@ func getTask(params *Params, taskID string) (*worker.Task, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		log.Printf("url: %s, taskID %s\n", urlL, taskID)
-		return nil, errors.New("not OK")
+		return nil, fmt.Errorf("url: %s, taskID %s, StatusCode: %d, err: %+v", urlL, taskID, res.StatusCode, err)
 	}
 	buffer, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -192,8 +196,7 @@ func getTask(params *Params, taskID string) (*worker.Task, error) {
 
 	var task = new(worker.Task)
 	if err := json.Unmarshal(buffer, task); err != nil {
-		log.Printf("url: %s, taskID %s, taskJson: %s\n", urlL, taskID, string(buffer))
-		return nil, err
+		return nil, fmt.Errorf("url: %s, taskID %s, taskJson: %s, err: %+v", urlL, taskID, string(buffer), err)
 	}
 
 	return task, nil
