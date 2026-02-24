@@ -4,16 +4,18 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"log"
 )
 
-var Config cfg
+var Cfg atomic.Pointer[cfg]
 
 type cfg struct {
-	Port        int `json:"port"`
-	WorkerCount int `json:"worker_count"`
-	WorkerQueue int `json:"worker_queue"`
+	Port        int    `json:"port"`
+	WorkerCount int    `json:"worker_count"`
+	WorkerQueue int    `json:"worker_queue"`
+	TmpDir      string `json:"tmp_dir"`
 }
 
 func Init() {
@@ -31,12 +33,33 @@ func Init() {
 		defer file.Close()
 
 		decoder := json.NewDecoder(file)
-		if err := decoder.Decode(&Config); err != nil {
+		var _cfg = new(cfg)
+		if err := decoder.Decode(_cfg); err != nil {
 			log.Printf("Ошибка декодирования: %v\n", err)
 			return
 		}
 
-		log.Printf("Загружен конфиг: %+v\n", Config)
+		Cfg.Store(_cfg)
+		log.Printf("Загружен конфиг: %+v\n", *_cfg)
 		return
 	}
+}
+
+func InitWithPath(logFilePath string) {
+	file, err := os.Open(logFilePath)
+	if err != nil {
+		//log.Printf("Ошибка открытия файла: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	var _cfg = new(cfg)
+	if err := decoder.Decode(_cfg); err != nil {
+		log.Printf("Ошибка декодирования: %v\n", err)
+		return
+	}
+
+	Cfg.Store(_cfg)
+	log.Printf("Загружен конфиг: %+v\n", *_cfg)
 }

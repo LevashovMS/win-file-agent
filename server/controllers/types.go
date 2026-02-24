@@ -11,22 +11,26 @@ import (
 	"net/url"
 	"strings"
 
+	"mediamagi.ru/win-file-agent/config"
 	"mediamagi.ru/win-file-agent/worker"
 )
 
 const oneGB uint64 = 1000 * 1000 * 1000
 
 type TaskReq struct {
-	InDir  string   `json:"in_dir"`
-	OutDir string   `json:"out_dir"`
-	Urls   []string `json:"urls"`
-	Cmd    string   `json:"cmd"`
-	Args   []string `json:"args"`
-	OutExt string   `json:"out_ext"`
+	InDir  string      `json:"in_dir"`
+	OutDir string      `json:"out_dir"`
+	Urls   []string    `json:"urls"`
+	Cmd    string      `json:"cmd"`
+	Args   []string    `json:"args"`
+	OutExt string      `json:"out_ext"`
+	Ftp    *worker.Ftp `json:"ftp"`
+
+	isSaveToFtp bool `json:"-"`
 }
 
-func (c *TaskReq) To() *worker.Task {
-	return &worker.Task{
+func (c *TaskReq) ToWTask() *worker.Task {
+	var t = &worker.Task{
 		ID:     c.getID(),
 		InDir:  c.InDir,
 		OutDir: c.OutDir,
@@ -35,15 +39,30 @@ func (c *TaskReq) To() *worker.Task {
 		Args:   c.Args,
 		OutExt: c.OutExt,
 	}
+	if c.isSaveToFtp {
+		t.SaveToFtp(c.Ftp)
+	}
+
+	return t
 }
 
-func (c *TaskReq) Verification() error {
+func (c *TaskReq) verification() error {
 	var msg []string
 	if len(c.InDir) == 0 {
 		msg = append(msg, "Не задана входящая папка")
 	}
 	if len(c.OutDir) == 0 {
-		msg = append(msg, "Не задана исходящая папка")
+		if c.Ftp == nil {
+			msg = append(msg, "Не задана исходящая папка")
+			msg = append(msg, "Не заданы настройки ftp")
+		}
+		if len(config.Cfg.Load().TmpDir) == 0 {
+			msg = append(msg, "Не задано в настройках сервиса временное хранение файлов")
+		}
+		if len(c.Ftp.Addr) == 0 {
+			msg = append(msg, "Не задан адрес ftp сервера")
+		}
+		c.isSaveToFtp = true
 	}
 	if len(c.Urls) == 0 {
 		msg = append(msg, "Не задан(ы) файлы для скачивания")

@@ -8,6 +8,7 @@
 *.dll
 *.so
 *.dylib
+win-file-agent
 
 # Test binary, built with `go test -c`
 *.test
@@ -25,3 +26,9 @@ go.work.sum
 # env file
 .env
 
+#log
+app.log
+test.log
+
+#test
+CS100files.txt
