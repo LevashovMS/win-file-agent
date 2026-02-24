@@ -2,5 +2,5 @@
   "port": 8080,
   "worker_count": 10,
   "worker_queue": 100,
-  "tmp_dir": ""
+  "tmp_dir": "C:\tmp"
 }

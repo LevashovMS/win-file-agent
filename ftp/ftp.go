@@ -173,126 +173,11 @@ func Dial(addr string, options ...DialOption) (*ServerConn, error) {
 	return c, nil
 }
 
-// DialWithTimeout returns a DialOption that configures the ServerConn with specified timeout
-func DialWithTimeout(timeout time.Duration) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.dialer.Timeout = timeout
-	}}
-}
-
-// DialWithShutTimeout returns a DialOption that configures the ServerConn with
-// maximum time to wait for the data closing status on control connection
-// and nudging the control connection deadline before reading status.
-func DialWithShutTimeout(shutTimeout time.Duration) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.shutTimeout = shutTimeout
-	}}
-}
-
-// DialWithDialer returns a DialOption that configures the ServerConn with specified net.Dialer
-func DialWithDialer(dialer net.Dialer) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.dialer = dialer
-	}}
-}
-
-// DialWithNetConn returns a DialOption that configures the ServerConn with the underlying net.Conn
-//
-// Deprecated: Use [DialWithDialFunc] instead
-func DialWithNetConn(conn net.Conn) DialOption {
-	return DialWithDialFunc(func(network, address string) (net.Conn, error) {
-		return conn, nil
-	})
-}
-
-// DialWithDisabledEPSV returns a DialOption that configures the ServerConn with EPSV disabled
-// Note that EPSV is only used when advertised in the server features.
-func DialWithDisabledEPSV(disabled bool) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.disableEPSV = disabled
-	}}
-}
-
-// DialWithDisabledUTF8 returns a DialOption that configures the ServerConn with UTF8 option disabled
-func DialWithDisabledUTF8(disabled bool) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.disableUTF8 = disabled
-	}}
-}
-
-// DialWithDisabledMLSD returns a DialOption that configures the ServerConn with MLSD option disabled
-//
-// This is useful for servers which advertise MLSD (eg some versions
-// of Serv-U) but don't support it properly.
-func DialWithDisabledMLSD(disabled bool) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.disableMLSD = disabled
-	}}
-}
-
-// DialWithWritingMDTM returns a DialOption making ServerConn use MDTM to set file time
-//
-// This option addresses a quirk in the VsFtpd server which doesn't support
-// the MFMT command for setting file time like other servers but by default
-// uses the MDTM command with non-standard arguments for that.
-// See "mdtm_write" in https://security.appspot.com/vsftpd/vsftpd_conf.html
-func DialWithWritingMDTM(enabled bool) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.writingMDTM = enabled
-	}}
-}
-
-// DialWithForceListHidden returns a DialOption making ServerConn use LIST -a to include hidden files and folders in directory listings
-//
-// This is useful for servers that do not do this by default, but it forces the use of the LIST command
-// even if the server supports MLST.
-func DialWithForceListHidden(enabled bool) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.forceListHidden = enabled
-	}}
-}
-
-// DialWithLocation returns a DialOption that configures the ServerConn with specified time.Location
-// The location is used to parse the dates sent by the server which are in server's timezone
-func DialWithLocation(location *time.Location) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.location = location
-	}}
-}
-
 // DialWithContext returns a DialOption that configures the ServerConn with specified context
 // The context will be used for the initial connection setup
 func DialWithContext(ctx context.Context) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.context = ctx
-	}}
-}
-
-// DialWithTLS returns a DialOption that configures the ServerConn with specified TLS config
-//
-// If called together with the DialWithDialFunc option, the DialWithDialFunc function
-// will be used when dialing new connections but regardless of the function,
-// the connection will be treated as a TLS connection.
-func DialWithTLS(tlsConfig *tls.Config) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.tlsConfig = tlsConfig
-	}}
-}
-
-// DialWithExplicitTLS returns a DialOption that configures the ServerConn to be upgraded to TLS
-// See DialWithTLS for general TLS documentation
-func DialWithExplicitTLS(tlsConfig *tls.Config) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.explicitTLS = true
-		do.tlsConfig = tlsConfig
-	}}
-}
-
-// DialWithDebugOutput returns a DialOption that configures the ServerConn to write to the Writer
-// everything it reads from the server
-func DialWithDebugOutput(w io.Writer) DialOption {
-	return DialOption{func(do *dialOptions) {
-		do.debugOutput = w
 	}}
 }
 
@@ -314,20 +199,6 @@ func (o *dialOptions) wrapConn(netConn net.Conn) io.ReadWriteCloser {
 	}
 
 	return newDebugWrapper(netConn, o.debugOutput)
-}
-
-// Connect is an alias to Dial, for backward compatibility
-//
-// Deprecated: Use [Dial] instead
-func Connect(addr string) (*ServerConn, error) {
-	return Dial(addr)
-}
-
-// DialTimeout initializes the connection to the specified ftp server address.
-//
-// Deprecated: Use [Dial] with [DialWithTimeout] option instead
-func DialTimeout(addr string, timeout time.Duration) (*ServerConn, error) {
-	return Dial(addr, DialWithTimeout(timeout))
 }
 
 // Login authenticates the client with specified user and password.
@@ -646,119 +517,6 @@ func (c *ServerConn) Type(transferType TransferType) (err error) {
 	return err
 }
 
-// IsTimePreciseInList returns true if client and server support the MLSD
-// command so List can return time with 1-second precision for all files.
-func (c *ServerConn) IsTimePreciseInList() bool {
-	return c.mlstSupported
-}
-
-// ChangeDir issues a CWD FTP command, which changes the current directory to
-// the specified path.
-func (c *ServerConn) ChangeDir(path string) error {
-	_, _, err := c.cmd(StatusRequestedFileActionOK, "CWD %s", path)
-	return err
-}
-
-// ChangeDirToParent issues a CDUP FTP command, which changes the current
-// directory to the parent directory.  This is similar to a call to ChangeDir
-// with a path set to "..".
-func (c *ServerConn) ChangeDirToParent() error {
-	_, _, err := c.cmd(StatusRequestedFileActionOK, "CDUP")
-	return err
-}
-
-// CurrentDir issues a PWD FTP command, which Returns the path of the current
-// directory.
-func (c *ServerConn) CurrentDir() (string, error) {
-	_, msg, err := c.cmd(StatusPathCreated, "PWD")
-	if err != nil {
-		return "", err
-	}
-
-	start := strings.Index(msg, "\"")
-	end := strings.LastIndex(msg, "\"")
-
-	if start == -1 || end == -1 {
-		return "", errors.New("unsuported PWD response format")
-	}
-
-	return msg[start+1 : end], nil
-}
-
-// FileSize issues a SIZE FTP command, which Returns the size of the file
-func (c *ServerConn) FileSize(path string) (int64, error) {
-	_, msg, err := c.cmd(StatusFile, "SIZE %s", path)
-	if err != nil {
-		return 0, err
-	}
-
-	return strconv.ParseInt(msg, 10, 64)
-}
-
-// GetTime issues the MDTM FTP command to obtain the file modification time.
-// It returns a UTC time.
-func (c *ServerConn) GetTime(path string) (time.Time, error) {
-	var t time.Time
-	if !c.mdtmSupported {
-		return t, errors.New("GetTime is not supported")
-	}
-	_, msg, err := c.cmd(StatusFile, "MDTM %s", path)
-	if err != nil {
-		return t, err
-	}
-	return time.ParseInLocation(timeFormat, msg, time.UTC)
-}
-
-// IsGetTimeSupported allows library callers to check in advance that they
-// can use GetTime to get file time.
-func (c *ServerConn) IsGetTimeSupported() bool {
-	return c.mdtmSupported
-}
-
-// SetTime issues the MFMT FTP command to set the file modification time.
-// Also it can use a non-standard form of the MDTM command supported by
-// the VsFtpd server instead of MFMT for the same purpose.
-// See "mdtm_write" in https://security.appspot.com/vsftpd/vsftpd_conf.html
-func (c *ServerConn) SetTime(path string, t time.Time) (err error) {
-	utime := t.In(time.UTC).Format(timeFormat)
-	switch {
-	case c.mfmtSupported:
-		_, _, err = c.cmd(StatusFile, "MFMT %s %s", utime, path)
-	case c.mdtmCanWrite:
-		_, _, err = c.cmd(StatusFile, "MDTM %s %s", utime, path)
-	default:
-		err = errors.New("SetTime is not supported")
-	}
-	return
-}
-
-// IsSetTimeSupported allows library callers to check in advance that they
-// can use SetTime to set file time.
-func (c *ServerConn) IsSetTimeSupported() bool {
-	return c.mfmtSupported || c.mdtmCanWrite
-}
-
-// Retr issues a RETR FTP command to fetch the specified file from the remote
-// FTP server.
-//
-// The returned ReadCloser must be closed to cleanup the FTP data connection.
-func (c *ServerConn) Retr(path string) (*Response, error) {
-	return c.RetrFrom(path, 0)
-}
-
-// RetrFrom issues a RETR FTP command to fetch the specified file from the remote
-// FTP server, the server will not send the offset first bytes of the file.
-//
-// The returned ReadCloser must be closed to cleanup the FTP data connection.
-func (c *ServerConn) RetrFrom(path string, offset uint64) (*Response, error) {
-	conn, err := c.cmdDataConnFrom(offset, "RETR %s", path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Response{conn: conn, c: c}, nil
-}
-
 // Stor issues a STOR FTP command to store a file to the remote FTP server.
 // Stor creates the specified file with the content of the io.Reader.
 //
@@ -830,20 +588,6 @@ func (c *ServerConn) StorFrom(path string, r io.Reader, offset uint64) error {
 	return errs
 }
 
-// NoOp issues a NOOP FTP command.
-// NOOP has no effects and is usually used to prevent the remote FTP server to
-// close the otherwise idle connection.
-func (c *ServerConn) NoOp() error {
-	_, _, err := c.cmd(StatusCommandOK, "NOOP")
-	return err
-}
-
-// Logout issues a REIN FTP command to logout the current user.
-func (c *ServerConn) Logout() error {
-	_, _, err := c.cmd(StatusReady, "REIN")
-	return err
-}
-
 // Quit issues a QUIT FTP command to properly close the connection from the
 // remote FTP server.
 func (c *ServerConn) Quit() error {
@@ -858,11 +602,6 @@ func (c *ServerConn) Quit() error {
 	}
 
 	return errs
-}
-
-// Read implements the io.Reader interface on a FTP data connection.
-func (r *Response) Read(buf []byte) (int, error) {
-	return r.conn.Read(buf)
 }
 
 // Close implements the io.Closer interface on a FTP data connection.
@@ -884,14 +623,4 @@ func (r *Response) Close() error {
 
 	r.closed = true
 	return errs
-}
-
-// SetDeadline sets the deadlines associated with the connection.
-func (r *Response) SetDeadline(t time.Time) error {
-	return r.conn.SetDeadline(t)
-}
-
-// String returns the string representation of EntryType t.
-func (t EntryType) String() string {
-	return [...]string{"file", "folder", "link"}[t]
 }

@@ -235,7 +235,7 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 		return nil
 	}
 
-	ftpClient, err := ftp.Dial(task.Ftp.Addr)
+	ftpClient, err := ftp.Dial(task.Ftp.Addr, ftp.DialWithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.Ftp.Addr)
 	}
