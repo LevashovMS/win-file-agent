@@ -152,7 +152,7 @@ func postTask(params *Params, reqData controllers.TaskReq) (string, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("url: %s, StatusCode: %d, taskJson: %s", urlL, res.StatusCode, reqData)
+		return "", fmt.Errorf("url: %s, StatusCode: %d, taskJson: %+v", urlL, res.StatusCode, reqData)
 	}
 
 	buffer, err = io.ReadAll(res.Body)
