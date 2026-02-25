@@ -5,13 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 
 	"mediamagi.ru/win-file-agent/config"
+	"mediamagi.ru/win-file-agent/errors"
+	"mediamagi.ru/win-file-agent/log"
 	"mediamagi.ru/win-file-agent/worker"
 )
 
@@ -99,7 +99,7 @@ func (c *TaskReq) getID() string {
 
 	var b bytes.Buffer
 	if err := gob.NewEncoder(&b).Encode(c); err != nil {
-		log.Printf("Обшибка создания ID, %+v", err)
+		log.Error("Обшибка создания ID, %+v", errors.WithStack(err))
 		return ""
 	}
 

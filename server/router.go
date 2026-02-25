@@ -3,10 +3,12 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"runtime"
+
+	"mediamagi.ru/win-file-agent/errors"
+	"mediamagi.ru/win-file-agent/log"
 )
 
 type routerAction func(*http.Request) (any, error)
@@ -32,7 +34,7 @@ type routerExt struct {
 func (c *routerExt) generalHandler(res http.ResponseWriter, req *http.Request) {
 	var pc = reflect.ValueOf(c.h).Pointer()
 	var name = runtime.FuncForPC(pc).Name()
-	log.Printf("Method: %s, Path: %s -> %s\n", req.Method, req.URL.Path, name)
+	log.Debug("Method: %s, Path: %s -> %s\n", req.Method, req.URL.Path, name)
 
 	var data, err = c.h(req)
 	if err != nil {
@@ -43,7 +45,7 @@ func (c *routerExt) generalHandler(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 		default:
-			log.Printf("%+v\n", err)
+			log.Error("%+v\n", errors.WithStack(err))
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -56,7 +58,7 @@ func (c *routerExt) generalHandler(res http.ResponseWriter, req *http.Request) {
 
 	buffer, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("%+v\n", err)
+		log.Error("%+v\n", errors.WithStack(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -65,7 +67,7 @@ func (c *routerExt) generalHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 	_, err = res.Write(buffer)
 	if err != nil {
-		log.Printf("%+v\n", err)
+		log.Error("%+v\n", errors.WithStack(err))
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}

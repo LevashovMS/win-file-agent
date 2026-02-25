@@ -3,7 +3,10 @@
 
 package disk
 
-import "golang.org/x/sys/windows"
+import (
+	"golang.org/x/sys/windows"
+	"mediamagi.ru/win-file-agent/errors"
+)
 
 func GetFreeSpace(path string) (uint64, error) {
 	var freeBytesAvailable uint64
@@ -14,5 +17,5 @@ func GetFreeSpace(path string) (uint64, error) {
 		&freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)
 	println(freeBytesAvailable)
 
-	return freeBytesAvailable, err
+	return freeBytesAvailable, errors.WithStack(err)
 }

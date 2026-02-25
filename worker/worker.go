@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,7 +12,9 @@ import (
 	"time"
 
 	"mediamagi.ru/win-file-agent/config"
+	"mediamagi.ru/win-file-agent/errors"
 	"mediamagi.ru/win-file-agent/ftp"
+	"mediamagi.ru/win-file-agent/log"
 	"mediamagi.ru/win-file-agent/store"
 )
 
@@ -62,7 +63,7 @@ func (c *Worker) Run(ctx context.Context) error {
 
 func (c *Worker) Stop() {
 	c.shutdownOnce.Do(func() {
-		log.Println("Shutdown requested")
+		log.Info("Shutdown requested")
 
 		// 1) Сигналируем всему: отменяем контекст
 		c.cancel()
@@ -75,7 +76,7 @@ func (c *Worker) Stop() {
 		case <-done:
 			// всё ок
 		case <-time.After(10 * time.Second):
-			log.Println("Workers didn’t finish in time – force kill")
+			log.Info("Workers didn’t finish in time – force kill")
 		}
 
 		// 4) Принудительно завершаем «живающие» внешние процессы
@@ -112,37 +113,37 @@ func (c *Worker) workerLoop(ctx context.Context) {
 					for _, fileName := range task.Files {
 						var filePath = filepath.Join(task.InDir, fileName)
 						if err := os.Remove(filePath); err != nil {
-							log.Printf("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
+							log.Error("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
 						}
-						log.Printf("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
+						log.Debug("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
 						if task.saveToFtp {
 							filePath = task.GetOutPath(fileName)
 							if err := os.Remove(filePath); err != nil {
-								log.Printf("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
+								log.Error("Task %s os.Remove error, filePath %s, err %+v\n", task.ID, filePath, err)
 							} else {
-								log.Printf("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
+								log.Debug("Task %s os.Remove successfully, filePath %s\n", task.ID, filePath)
 							}
 						}
 					}
 				}()
 
 				if err := c.downloadFiles(ctx, task); err != nil {
-					log.Printf("Task %s downloadFiles error: %v", task.ID, err)
+					log.Error("Task %s downloadFiles error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
 				if err := c.executeTask(ctx, task); err != nil {
-					log.Printf("Task %s executeTask error: %v", task.ID, err)
+					log.Error("Task %s executeTask error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
 				if err := c.ftpStore(ctx, task); err != nil {
-					log.Printf("Task %s ftpStore error: %v", task.ID, err)
+					log.Error("Task %s ftpStore error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
 
-				log.Printf("Task %s finished successfully", task.ID)
+				log.Info("Task %s finished successfully", task.ID)
 				c.setState(task.ID, FINISH)
 			}()
 		}
@@ -162,7 +163,7 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 		// 1. Get the data from the URL
 		resp, err := http.Get(urlStr)
 		if err != nil {
-			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
+			return errors.Errorf("fileName %s, urlStr %s, err %+v", fileName, urlStr, err)
 		}
 		// Ensure the response body is closed after the function returns
 		defer resp.Body.Close()
@@ -171,7 +172,7 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 		// 2. Create the local file
 		out, err := os.Create(filepath)
 		if err != nil {
-			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
+			return errors.Errorf("fileName %s, urlStr %s, err %+v", fileName, urlStr, err)
 		}
 		// Ensure the file is closed after the function returns
 		defer out.Close()
@@ -180,10 +181,10 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 		task.Files = append(task.Files, fileName)
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
-			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
+			return errors.Errorf("fileName %s, urlStr %s, err %+v", fileName, urlStr, err)
 		}
 
-		log.Printf("Task %s url %s Downloaded file to %s\n", task.ID, urlStr, filepath)
+		log.Debug("Task %s url %s Downloaded file to %s\n", task.ID, urlStr, filepath)
 	}
 	return nil
 }
@@ -222,14 +223,14 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 
 		// запускаем
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
+			return errors.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
 		}
 		// ждём завершения
 		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
+			return errors.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
 		}
 
-		log.Printf("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
+		log.Debug("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
 	}
 
 	return nil
@@ -243,17 +244,17 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 
 	ftpClient, err := ftp.Dial(task.ftp.Addr, ftp.DialWithContext(ctx))
 	if err != nil {
-		return fmt.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.ftp.Addr)
+		return errors.Errorf("ftp.Dial Task %s err %+v Addr %s", task.ID, err, task.ftp.Addr)
 	}
 	defer func() {
 		if err := ftpClient.Quit(); err != nil {
-			log.Printf("ftpClient.Quit() err: %+v\n", err)
+			log.Error("ftpClient.Quit() err: %+v\n", err)
 		}
 	}()
 
 	err = ftpClient.Login(task.ftp.Login, task.ftp.Pass)
 	if err != nil {
-		return fmt.Errorf("ftpClient.Login Task %s err %+v Login %s Pass %s", task.ID, err, task.ftp.Login, task.ftp.Pass)
+		return errors.Errorf("ftpClient.Login Task %s err %+v Login %s Pass %s", task.ID, err, task.ftp.Login, task.ftp.Pass)
 	}
 
 	for _, fileName := range task.Files {
@@ -267,16 +268,16 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 			var filePath = task.GetOutPath(fileName)
 			file, err := os.Open(filePath)
 			if err != nil {
-				return fmt.Errorf("os.Open Task %s err %+v filePath %s", task.ID, err, filePath)
+				return errors.Errorf("os.Open Task %s err %+v filePath %s", task.ID, err, filePath)
 			}
 			defer file.Close()
 
 			err = ftpClient.Stor(fileName, file)
 			if err != nil {
-				return fmt.Errorf("ftpClient.Stor Task %s err %+v fileName %s filePath %s", task.ID, err, fileName, filePath)
+				return errors.Errorf("ftpClient.Stor Task %s err %+v fileName %s filePath %s", task.ID, err, fileName, filePath)
 			}
 
-			log.Printf("Task %s ftpStore successfully, filePath %s\n", task.ID, filePath)
+			log.Debug("Task %s ftpStore successfully, filePath %s\n", task.ID, filePath)
 			return nil
 		}()
 		if err != nil {
@@ -304,9 +305,9 @@ func (c *Worker) stopProc(key string, task *Task) bool {
 	// 2) Отправляем graceful‑kill (Ctrl+C) – но для cmd.exe/PowerShell это не всегда работает.
 	// Лучше сразу kill
 	if err := cmd.Process.Kill(); err != nil {
-		log.Printf("Failed to kill child %s: %v", key, err)
+		log.Error("Failed to kill child %s: %+v", key, err)
 	} else {
-		log.Printf("Killed child %s", key)
+		log.Info("Killed child %s", key)
 	}
 
 	return true
