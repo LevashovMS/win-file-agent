@@ -1,0 +1,11 @@
+[Unit]
+Description=Test script win-file-agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=win-file-agent
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
