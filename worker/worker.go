@@ -162,7 +162,7 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 		// 1. Get the data from the URL
 		resp, err := http.Get(urlStr)
 		if err != nil {
-			return err
+			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
 		}
 		// Ensure the response body is closed after the function returns
 		defer resp.Body.Close()
@@ -171,19 +171,19 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 		// 2. Create the local file
 		out, err := os.Create(filepath)
 		if err != nil {
-			return err
+			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
 		}
 		// Ensure the file is closed after the function returns
 		defer out.Close()
 
-		// 3. Stream the response body to the file
+		// фиксируем имя файла для удаления до самого копирования.
+		task.Files = append(task.Files, fileName)
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
-			return err
+			return fmt.Errorf("err %+v fileName %s, urlStr %s", err, fileName, urlStr)
 		}
-		task.Files = append(task.Files, fileName)
 
-		log.Printf("Task %s Downloaded file to %s\n", task.ID, filepath)
+		log.Printf("Task %s url %s Downloaded file to %s\n", task.ID, urlStr, filepath)
 	}
 	return nil
 }
