@@ -16,15 +16,15 @@ type Server interface {
 }
 
 type server struct {
-	ctx    context.Context // общий контекст
-	cf     context.CancelFunc
-	srv    *http.Server // HTTP‑сервер
-	port   int
-	router *router
+	ctx  context.Context // общий контекст
+	cf   context.CancelFunc
+	srv  *http.Server // HTTP‑сервер
+	port int
+	mux  *http.ServeMux
 }
 
 func New(args ...ArgsHandler) Server {
-	var s = &server{router: newRouter()}
+	var s = &server{mux: http.NewServeMux()}
 	for _, it := range args {
 		it(s)
 	}
@@ -42,7 +42,7 @@ func (c *server) Run(ctx context.Context) (err error) {
 	// 1) Запускаем HTTP‑сервер
 	c.srv = &http.Server{
 		Addr:              addrPort,
-		Handler:           c.router.mux,
+		Handler:           c.mux,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,

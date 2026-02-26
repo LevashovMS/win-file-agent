@@ -82,7 +82,7 @@ func (c *TaskReq) verification() error {
 	}
 
 	if len(msg) > 0 {
-		return errors.New(strings.Join(msg, " "))
+		return errors.New(strings.Join(msg, "\n"))
 	}
 
 	if len(c.OutExt) > 0 && c.OutExt[0] != '.' {
