@@ -220,6 +220,7 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 		// настройка
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		task.cmd = cmd
 
 		// запускаем
 		if err := cmd.Start(); err != nil {
@@ -297,6 +298,10 @@ func (c *Worker) stopProc(key string, task *Task) bool {
 	}
 
 	var cmd = task.cmd
+	if cmd == nil {
+		log.Printf("Task %s cmd == nil", key)
+		return true
+	}
 	// 1) Если процесс уже завершён – skip
 	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
 		return true
