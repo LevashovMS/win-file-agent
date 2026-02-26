@@ -2,7 +2,7 @@
 
 # params
 URL="http://91.220.62.199:8080/v1"
-REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"libx264\",\"-b:v\",\"500k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"\",\"pass\":\"\"}}'
+REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"libx264\",\"-b:v\",\"500k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
 CSV="CS100files.txt"
 TASK_COUNT=1
 FILE_COUNT=2
@@ -11,6 +11,10 @@ FILE_COUNT=2
 TASK="task"
 
 echo "Начало"
+
+#arguments
+LOGIN=$1
+PASS=$2
 
 function req_post() {
     local arr=("$@")
@@ -28,7 +32,7 @@ function req_post() {
 
     #echo "${formatted_string}"
 
-    printf -v post_data $REQ_DATA $formatted_string
+    printf -v post_data $REQ_DATA $formatted_string $LOGIN $PASS
     echo $post_data
 
     local url=$URL'/'$TASK
@@ -109,7 +113,7 @@ function read_file() {
             if [ $tasks -eq $TASK_COUNT ]; then
                 sleep 1
                 tasks=0
-                echo "WAIT"
+                echo "WAIT tasks"
                 wait
             fi
         done < "$CSV"
@@ -127,7 +131,15 @@ function main() {
     done
 }
 
-main
+if [[ ${#LOGIN} -eq 0 || ${#PASS} -eq 0 ]]; then
+    echo "Пустой параметр LOGIN $LOGIN PASS $PASS"
+    return
+fi
+
 #req_get "b1ddf2f681d20de50f0865050846c5edab196550e1bc3289e5e0c6ceabee4a24"
+#my_array=("apple" "banana" "cherry")
+#req_post $my_array
+
+main
 
 echo "Все задачи завершены"
