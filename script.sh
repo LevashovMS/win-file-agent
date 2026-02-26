@@ -2,9 +2,9 @@
 
 # params
 URL="http://91.220.62.199:8080/v1"
-REQ_DATA="{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"libx264\",\"-b:v\",\"500k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"winworkflow\",\"pass\":\"ish7eeQu\"}}"
+REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"libx264\",\"-b:v\",\"500k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"winworkflow\",\"pass\":\"ish7eeQu\"}}'
 CSV="CS100files.txt"
-TASK_COUNT=3
+TASK_COUNT=1
 FILE_COUNT=2
 
 # controllers
@@ -25,23 +25,59 @@ task() {
 
 function req_post() {
     local arr=("$@")
-    IFS=','
-    printf -v formatted_string '"%s"' "${arr[*]// /|}"
-    ( IFS=','; printf '"%s"' "${arr[*]// /|}" )
+    formatted_string=''
+    first=true
+    for each in "${arr[@]}"
+    do
+        if $first; then
+            first=false
+            formatted_string+='"'$each'"'
+        else
+            formatted_string+=',"'$each'"'
+        fi
+    done
+
     #echo "${formatted_string}"
 
-    #printf -v formatted_string $REQ_DATA $formatted_string
-    echo "${formatted_string}"
+    printf -v post_data $REQ_DATA $formatted_string
+    echo $post_data
 
+    local url=$URL'/'$TASK
+    echo $url
     sleep 3
-    #curl -i --location '$URL/$TASK' \
-    #--header 'Content-Type: application/json' \
-    #--data '$REQ_DATA'
+
+    local tmpfile=$(mktemp)
+
+    # Run curl, writing the body to a temporary file and the status code to stdout
+    local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile" -d "$post_data" "$url")
+    local body=$(cat "$tmpfile")
+    rm "$tmpfile" # Clean up the temporary file
+
+    echo "Status Code: $status_code"
+    echo "Response Body: $body"
+
+    if [ $status_code -eq 201 ]; then
+        req_get $body
+    fi
 }
 
 function req_get() {
-    curl -i --location '$URL/$TASK/$1' \
-    --header 'Content-Type: application/json'
+    while true; do
+        url=$URL'/'$TASK'/'$1
+        curl -i --location $url
+        # Run curl, writing the body to a temporary file and the status code to stdout
+        local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile" "$url")
+
+        local body=$(cat "$tmpfile")
+        rm "$tmpfile" # Clean up the temporary file
+        echo "Status Code: $status_code"
+
+        if [ $status_code -eq 200 ]; then
+            echo "Response Body: $body"
+        fi
+
+        return
+    done
 }
 
 function read_file() {
