@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -9,16 +10,29 @@ import (
 	"mediamagi.ru/win-file-agent/log"
 )
 
-var Cfg atomic.Pointer[cfg]
+var cfg atomic.Pointer[cfgData]
 
-type cfg struct {
+type cfgData struct {
 	Port        int    `json:"port"`
 	WorkerCount int    `json:"worker_count"`
 	WorkerQueue int    `json:"worker_queue"`
 	TmpDir      string `json:"tmp_dir"`
 }
 
-func Init() {
+func init() {
+	// default
+	cfg.Store(&cfgData{
+		Port:        8099,
+		WorkerCount: 1,
+		WorkerQueue: 10,
+	})
+}
+
+func Load() *cfgData {
+	return cfg.Load()
+}
+
+func InitFromFile(args ...string) {
 	for _, fileName := range []string{"config.json", "config/config.json"} {
 		execPath, err := os.Executable()
 		if err != nil {
@@ -32,34 +46,19 @@ func Init() {
 		}
 		defer file.Close()
 
-		decoder := json.NewDecoder(file)
-		var _cfg = new(cfg)
-		if err := decoder.Decode(_cfg); err != nil {
-			log.Error("Ошибка декодирования: %+v\n", err)
-			return
-		}
-
-		Cfg.Store(_cfg)
-		log.Debug("Загружен конфиг: %+v\n", *_cfg)
+		InitFromJson(file)
 		return
 	}
 }
 
-func InitWithPath(logFilePath string) {
-	file, err := os.Open(logFilePath)
-	if err != nil {
-		//log.Printf("Ошибка открытия файла: %v\n", err)
-		return
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	var _cfg = new(cfg)
+func InitFromJson(data io.Reader) {
+	decoder := json.NewDecoder(data)
+	var _cfg = new(cfgData)
 	if err := decoder.Decode(_cfg); err != nil {
 		log.Error("Ошибка декодирования: %+v\n", err)
 		return
 	}
 
-	Cfg.Store(_cfg)
+	cfg.Store(_cfg)
 	log.Debug("Загружен конфиг: %+v\n", *_cfg)
 }

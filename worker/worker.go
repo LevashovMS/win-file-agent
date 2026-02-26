@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -25,11 +26,12 @@ type Worker struct {
 	wg           sync.WaitGroup // воркер‑пул
 	taskQueue    chan *Task
 	store        store.Store[string, *Task]
+	storeProc    store.Store[string, context.CancelFunc]
 	shutdownOnce sync.Once
 }
 
-func New(store store.Store[string, *Task]) *Worker {
-	var cfg = config.Cfg.Load()
+func New(storeT store.Store[string, *Task]) *Worker {
+	var cfg = config.Load()
 	var workerCount = cfg.WorkerCount
 	if workerCount < 1 {
 		workerCount = 4
@@ -45,7 +47,8 @@ func New(store store.Store[string, *Task]) *Worker {
 	return &Worker{
 		count:     workerCount,
 		taskQueue: make(chan *Task, workerQueue),
-		store:     store,
+		store:     storeT,
+		storeProc: store.NewRam[string, context.CancelFunc](context.TODO()),
 	}
 }
 
@@ -108,7 +111,10 @@ func (c *Worker) workerLoop(ctx context.Context) {
 			return
 		case task := <-c.taskQueue:
 			func() {
+				var ctxPrc, cf = context.WithCancel(ctx)
+				c.storeProc.Store(task.ID, cf)
 				defer func() {
+					c.storeProc.Delete(task.ID)
 					// удаляем файлы
 					for _, fileName := range task.Files {
 						var filePath = filepath.Join(task.InDir, fileName)
@@ -127,17 +133,17 @@ func (c *Worker) workerLoop(ctx context.Context) {
 					}
 				}()
 
-				if err := c.downloadFiles(ctx, task); err != nil {
+				if err := c.downloadFiles(ctxPrc, task); err != nil {
 					log.Error("Task %s downloadFiles error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
-				if err := c.executeTask(ctx, task); err != nil {
+				if err := c.executeTask(ctxPrc, task); err != nil {
 					log.Error("Task %s executeTask error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
 				}
-				if err := c.ftpStore(ctx, task); err != nil {
+				if err := c.ftpStore(ctxPrc, task); err != nil {
 					log.Error("Task %s ftpStore error: %+v", task.ID, err)
 					c.setState(task.ID, ERROR, err)
 					return
@@ -161,7 +167,11 @@ func (c *Worker) downloadFiles(ctx context.Context, task *Task) error {
 
 		var fileName = fmt.Sprintf("%s_%d", task.ID, idx)
 		// 1. Get the data from the URL
-		resp, err := http.Get(urlStr)
+		var req, err = http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+		if err != nil {
+			return errors.Errorf("fileName %s, urlStr %s, err %+v", fileName, urlStr, err)
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return errors.Errorf("fileName %s, urlStr %s, err %+v", fileName, urlStr, err)
 		}
@@ -218,17 +228,19 @@ func (c *Worker) executeTask(ctx context.Context, task *Task) error {
 		// пример: ffmpeg -i input.mp4 -c:v libx264 -b:v 500k -c:a copy output.mp4
 		cmd := exec.CommandContext(ctx, task.Cmd, args...)
 		// настройка
+		var buffer = new(bytes.Buffer)
 		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		//cmd.Stderr = os.Stderr
+		cmd.Stderr = buffer
 		task.cmd = cmd
 
 		// запускаем
 		if err := cmd.Start(); err != nil {
-			return errors.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
+			return errors.Errorf("err (%s), cmdErr %s, cmd %s, args %+v", err, buffer, task.Cmd, args)
 		}
 		// ждём завершения
 		if err := cmd.Wait(); err != nil {
-			return errors.Errorf("err %+v cmd %+v, args %+v", err, task.Cmd, args)
+			return errors.Errorf("err (%s), cmdErr %s, cmd %s, args %+v", err, buffer, task.Cmd, args)
 		}
 
 		log.Debug("Task %s exec.Command successfully, cmd %+v, args %+v\n", task.ID, task.Cmd, args)
@@ -249,7 +261,7 @@ func (c *Worker) ftpStore(ctx context.Context, task *Task) error {
 	}
 	defer func() {
 		if err := ftpClient.Quit(); err != nil {
-			log.Error("ftpClient.Quit() err: %+v\n", err)
+			log.Error("ftpClient.Quit() err: %+v", err)
 		}
 	}()
 
@@ -293,13 +305,17 @@ func (c *Worker) stopAllChildProcesses() {
 }
 
 func (c *Worker) stopProc(key string, task *Task) bool {
+	if cf, ok := c.storeProc.Load(key); ok {
+		cf()
+	}
+
 	if task.State != PROCESS {
 		return true
 	}
 
 	var cmd = task.cmd
 	if cmd == nil {
-		log.Printf("Task %s cmd == nil", key)
+		log.Error("Task %s cmd == nil", key)
 		return true
 	}
 	// 1) Если процесс уже завершён – skip
@@ -322,7 +338,7 @@ func (c *Worker) setState(id string, state StateCode, errs ...error) {
 	if task, ok := c.store.Load(id); ok {
 		task.State = state
 		if state == ERROR {
-			task.Msg = fmt.Sprintf("%v", errs)
+			task.Msg = fmt.Sprintf("%s", errs)
 			c.store.SetTimeout(id, time.Now().Add(time.Minute))
 		}
 		if state == FINISH {

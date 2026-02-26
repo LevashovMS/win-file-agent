@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"mediamagi.ru/win-file-agent/config"
 	"mediamagi.ru/win-file-agent/store"
 )
 
@@ -37,7 +36,6 @@ func TestUrls(t *testing.T) {
 func TestExec(t *testing.T) {
 	var ctx, cf = context.WithCancel(context.TODO())
 	defer cf()
-	config.InitWithPath("/config.json")
 	var store = store.NewRam[string, *Task](ctx)
 	var w = New(store)
 
@@ -63,7 +61,7 @@ func TestExec(t *testing.T) {
 	}
 	go func() {
 		var err = w.executeTask(ctx, task)
-		fmt.Printf("err: %+v\n", err)
+		fmt.Printf("%s\n", err)
 	}()
 
 	time.Sleep(2 * time.Second)
@@ -75,7 +73,6 @@ func TestExec(t *testing.T) {
 func TestFtp(t *testing.T) {
 	var ctx, cf = context.WithCancel(context.TODO())
 	defer cf()
-	config.InitWithPath("/config.json")
 	var store = store.NewRam[string, *Task](ctx)
 	var w = New(store)
 
@@ -119,7 +116,6 @@ func TestFtp(t *testing.T) {
 func TestCmdStop(t *testing.T) {
 	var ctx, cf = context.WithCancel(context.TODO())
 	defer cf()
-	config.InitWithPath("config/config.json")
 	var store = store.NewRam[string, *Task](ctx)
 	var w = New(store)
 
@@ -142,14 +138,16 @@ func TestCmdStop(t *testing.T) {
 		Files:  []string{"111_0"},
 		OutExt: ".mp4",
 	}
+
+	var ctxE, cf1 = context.WithCancel(ctx)
 	go func() {
-		var err = w.executeTask(ctx, task)
-		fmt.Printf("err: %+v\n", err)
+		var err = w.executeTask(ctxE, task)
+		fmt.Printf("%s\n", err)
 	}()
 
-	time.Sleep(1 * time.Second)
-	w.StopProc("111")
-	cf()
+	time.Sleep(100 * time.Millisecond)
+	//w.StopProc("111")
+	cf1()
 	time.Sleep(time.Second)
 	fmt.Printf("task: %+v\n", task)
 }

@@ -56,7 +56,7 @@ func (c *TaskReq) verification() error {
 			msg = append(msg, "Не задана исходящая папка")
 			msg = append(msg, "Не заданы настройки ftp")
 		}
-		if len(config.Cfg.Load().TmpDir) == 0 {
+		if len(config.Load().TmpDir) == 0 {
 			msg = append(msg, "Не задано в настройках сервиса временное хранение файлов")
 		}
 		if len(c.Ftp.Addr) == 0 {

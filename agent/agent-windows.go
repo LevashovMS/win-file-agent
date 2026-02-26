@@ -31,7 +31,7 @@ type agentWindows struct {
 func NewAgentWindows(name string) *agentWindows {
 	var ctx, cf = context.WithCancel(context.Background())
 	log1.Init(ctx)
-	config.Init()
+	config.InitFromFile()
 	return &agentWindows{
 		ctx:  ctx,
 		cf:   cf,
