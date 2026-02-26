@@ -64,7 +64,7 @@ function req_post() {
 function req_get() {
     while true; do
         url=$URL'/'$TASK'/'$1
-        curl -i --location $url
+        local tmpfile=$(mktemp)
         # Run curl, writing the body to a temporary file and the status code to stdout
         local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile" "$url")
 
@@ -74,6 +74,8 @@ function req_get() {
 
         if [ $status_code -eq 200 ]; then
             echo "Response Body: $body"
+            state=$(echo $body | grep -oP '"state":.+?,' | grep -Po '\d+')
+            echo $state
         fi
 
         sleep 3
@@ -120,6 +122,7 @@ function main() {
     done
 }
 
-main
+#main
+req_get "58bad3fd5cdebecc9b98bb1f8e73870b469802297d7b4c1167eb17bc0d99a4d2"
 
 echo "Все задачи завершены"
