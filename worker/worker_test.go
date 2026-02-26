@@ -3,84 +3,63 @@ package worker
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"mediamagi.ru/win-file-agent/store"
 )
 
-func TestUrls(t *testing.T) {
+func TestWorker(t *testing.T) {
 	var ctx, cf = context.WithCancel(context.TODO())
 	defer cf()
-	var store = store.NewRam[string, *Task](ctx)
-	var w = New(store)
 
-	var task = &Task{
-		ID:    "111",
-		InDir: "/home/max/Загрузки/tmp",
-		Urls: []string{
-			"https://github.com/chthomos/video-media-samples/blob/997cb58f16bc3433652506910734be75bc64d768/big-buck-bunny-1080p-30sec.mp4",
-		},
+	var w = New(store.NewRam[string, *Task](ctx))
+	if err := w.Run(ctx); err != nil {
+		fmt.Printf("%+v\n", err)
+		return
 	}
+
+	var task = defaultTask()
+	w.ExecTask(task)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		var err = w.downloadFiles(ctx, task)
-		fmt.Printf("err: %+v\n", err)
+		defer wg.Done()
+		for {
+			time.Sleep(1 * time.Second)
+			if t, ok := w.store.Load(task.ID); ok {
+				if t.State == PROCESS {
+					if _, err := w.StopProc(task.ID); err != nil {
+						fmt.Printf("%+v\n", err)
+					}
+					return
+				}
+				if t.State == FINISH || t.State == ERROR {
+					return
+				}
+
+				continue
+			}
+			return
+		}
+
 	}()
 
-	time.Sleep(2 * time.Second)
-	cf()
-	time.Sleep(time.Second)
+	wg.Wait()
+	time.Sleep(1 * time.Second)
 	fmt.Printf("task: %+v\n", task)
 }
 
-func TestExec(t *testing.T) {
-	var ctx, cf = context.WithCancel(context.TODO())
-	defer cf()
-	var store = store.NewRam[string, *Task](ctx)
-	var w = New(store)
-
-	//ffmpeg -i /home/max/Загрузки/tmp/big-buck-bunny-1080p-30sec.mp4 -c:v libx264 -b:v 500k -c:a copy /home/max/Загрузки/tmp_out/output.mp4
-	var task = &Task{
-		ID:     "111",
+func defaultTask() *Task {
+	return &Task{
+		ID:     "111222",
 		InDir:  "/home/max/Загрузки/tmp",
 		OutDir: "/home/max/Загрузки/tmp_out",
-		Cmd:    "ffmpeg",
-		Args: []string{
-			"-i",
-			"{input}",
-			"-c:v",
-			"libx264",
-			"-b:v",
-			"500k",
-			"-c:a",
-			"copy",
-			"{output}",
+		Urls: []string{
+			"http://localhost:8088/test.mp4",
 		},
-		Files:  []string{"111_0"},
-		OutExt: ".mp4",
-	}
-	go func() {
-		var err = w.executeTask(ctx, task)
-		fmt.Printf("%s\n", err)
-	}()
-
-	time.Sleep(2 * time.Second)
-	cf()
-	time.Sleep(time.Second)
-	fmt.Printf("task: %+v\n", task)
-}
-
-func TestFtp(t *testing.T) {
-	var ctx, cf = context.WithCancel(context.TODO())
-	defer cf()
-	var store = store.NewRam[string, *Task](ctx)
-	var w = New(store)
-
-	//ffmpeg -i /home/max/Загрузки/tmp/big-buck-bunny-1080p-30sec.mp4 -c:v libx264 -b:v 500k -c:a copy /home/max/Загрузки/tmp_out/output.mp4
-	var task = &Task{
-		ID:    "111",
-		InDir: "/home/max/Загрузки/tmp",
-		//OutDir: "/home/max/Загрузки/tmp_out",
 		Cmd: "ffmpeg",
 		Args: []string{
 			"-i",
@@ -93,61 +72,7 @@ func TestFtp(t *testing.T) {
 			"copy",
 			"{output}",
 		},
-		Files:  []string{"CS100files.txt"},
-		OutExt: ".mp4",
-		ftp: &Ftp{
-			Addr:  "",
-			Login: "",
-			Pass:  "",
-		},
-		saveToFtp: true,
-	}
-	go func() {
-		var err = w.ftpStore(ctx, task)
-		fmt.Printf("err: %+v\n", err)
-	}()
-
-	time.Sleep(2 * time.Second)
-	cf()
-	time.Sleep(time.Second)
-	fmt.Printf("task: %+v\n", task)
-}
-
-func TestCmdStop(t *testing.T) {
-	var ctx, cf = context.WithCancel(context.TODO())
-	defer cf()
-	var store = store.NewRam[string, *Task](ctx)
-	var w = New(store)
-
-	var task = &Task{
-		ID:     "111",
-		InDir:  "/home/max/Загрузки/tmp",
-		OutDir: "/home/max/Загрузки/tmp_out",
-		Cmd:    "ffmpeg",
-		Args: []string{
-			"-i",
-			"{input}",
-			"-c:v",
-			"libx264",
-			"-b:v",
-			"500k",
-			"-c:a",
-			"copy",
-			"{output}",
-		},
-		Files:  []string{"111_0"},
+		//Files:  []string{"111_0"},
 		OutExt: ".mp4",
 	}
-
-	var ctxE, cf1 = context.WithCancel(ctx)
-	go func() {
-		var err = w.executeTask(ctxE, task)
-		fmt.Printf("%s\n", err)
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-	//w.StopProc("111")
-	cf1()
-	time.Sleep(time.Second)
-	fmt.Printf("task: %+v\n", task)
 }
