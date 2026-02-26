@@ -12,17 +12,6 @@ TASK="task"
 
 echo "Начало"
 
-run_task() {
-    for i in {1..$1}; do
-        echo "Номер: $i"
-    done
-}
-
-task() {
-    echo "Выполнение задачи $1 $REQ_DATA"
-    sleep 2
-}
-
 function req_post() {
     local arr=("$@")
     formatted_string=''
@@ -58,6 +47,8 @@ function req_post() {
 
     if [ $status_code -eq 201 ]; then
         req_get $body
+    else
+        echo "Не получилось создать задачу на обработку"
     fi
 }
 
@@ -72,14 +63,28 @@ function req_get() {
         rm "$tmpfile" # Clean up the temporary file
         echo "Status Code: $status_code"
 
+        local cur_state=0
         if [ $status_code -eq 200 ]; then
             echo "Response Body: $body"
+            if [ ${#body} -eq 0 ]; then
+                echo "Нет данных по ключу $1"
+                return
+            fi
+
             state=$(echo $body | grep -oP '"state":.+?,' | grep -Po '\d+')
-            echo $state
+            echo "state $state"
+            if [ $state -ne $cur_state ]; then
+                cur_state=$state
+                echo "Смена состояния $cur_state key $1"
+            fi
+            if [[ $state -eq 127 || $state -eq 5 ]]; then
+                echo "Отслеживание завершено $state key $1"
+                return
+            fi
+            continue
         fi
 
         sleep 3
-
         return
     done
 }
@@ -122,7 +127,7 @@ function main() {
     done
 }
 
-#main
-req_get "58bad3fd5cdebecc9b98bb1f8e73870b469802297d7b4c1167eb17bc0d99a4d2"
+main
+#req_get "b1ddf2f681d20de50f0865050846c5edab196550e1bc3289e5e0c6ceabee4a24"
 
 echo "Все задачи завершены"
