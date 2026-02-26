@@ -2,7 +2,7 @@
 
 # params
 URL="http://91.220.62.199:8080/v1"
-REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"libx264\",\"-b:v\",\"500k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
+REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"aac\",\"-b:a\",\"64k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
 CSV="CS100files.txt"
 TASK_COUNT=1
 FILE_COUNT=2
@@ -18,8 +18,9 @@ PASS=$2
 
 function req_post() {
     local arr=("$@")
-    formatted_string=''
-    first=true
+    local formatted_string=''
+    local first=true
+
     for each in "${arr[@]}"
     do
         if $first; then
@@ -40,7 +41,6 @@ function req_post() {
     sleep 3
 
     local tmpfile=$(mktemp)
-
     # Run curl, writing the body to a temporary file and the status code to stdout
     local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile" -d "$post_data" "$url")
     local body=$(cat "$tmpfile")
@@ -50,24 +50,26 @@ function req_post() {
     echo "Response Body: $body"
 
     if [ $status_code -eq 201 ]; then
-        req_get $body
+        trimmed=$(echo "$body" | tr -d '"')
+        req_get $trimmed
     else
         echo "Не получилось создать задачу на обработку"
     fi
 }
 
 function req_get() {
-    while true; do
-        url=$URL'/'$TASK'/'$1
-        local tmpfile=$(mktemp)
-        # Run curl, writing the body to a temporary file and the status code to stdout
-        local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile" "$url")
+    local url=$URL'/'$TASK'/'$1
+    local tmpfile2=$(mktemp)
+    local cur_state=0
+    echo $url
 
-        local body=$(cat "$tmpfile")
-        rm "$tmpfile" # Clean up the temporary file
+    while true; do
+        # Run curl, writing the body to a temporary file and the status code to stdout
+        local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile2" "$url")
+        local body=$(cat "$tmpfile2")
+        rm "$tmpfile2" # Clean up the temporary file
         echo "Status Code: $status_code"
 
-        local cur_state=0
         if [ $status_code -eq 200 ]; then
             echo "Response Body: $body"
             if [ ${#body} -eq 0 ]; then
@@ -114,6 +116,7 @@ function read_file() {
                 sleep 1
                 tasks=0
                 echo "WAIT tasks"
+
                 wait
             fi
         done < "$CSV"
@@ -136,7 +139,7 @@ if [[ ${#LOGIN} -eq 0 || ${#PASS} -eq 0 ]]; then
     return
 fi
 
-#req_get "b1ddf2f681d20de50f0865050846c5edab196550e1bc3289e5e0c6ceabee4a24"
+#req_get "e749f52c9eae282e5f7eb87bdc02a7b5a2d7dabfcc3cad59c6adc130b13d9031"
 #my_array=("apple" "banana" "cherry")
 #req_post $my_array
 
