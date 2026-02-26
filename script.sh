@@ -2,7 +2,7 @@
 
 # params
 URL="http://91.220.62.199:8080/v1"
-REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"aac\",\"-b:a\",\"64k\",\"-c:a\",\"copy\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
+REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"copy\",\"-c:a\",\"aac\",\"-b:a\",\"64k\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
 CSV="CS100files.txt"
 TASK_COUNT=1
 FILE_COUNT=2
