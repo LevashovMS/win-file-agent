@@ -37,6 +37,7 @@ func TestUrls(t *testing.T) {
 func TestExec(t *testing.T) {
 	var ctx, cf = context.WithCancel(context.TODO())
 	defer cf()
+	config.InitWithPath("/config.json")
 	var store = store.NewRam[string, *Task](ctx)
 	var w = New(store)
 
@@ -58,7 +59,7 @@ func TestExec(t *testing.T) {
 			"{output}",
 		},
 		Files:  []string{"111_0"},
-		OutExt: "mp4",
+		OutExt: ".mp4",
 	}
 	go func() {
 		var err = w.executeTask(ctx, task)
@@ -96,7 +97,7 @@ func TestFtp(t *testing.T) {
 			"{output}",
 		},
 		Files:  []string{"CS100files.txt"},
-		OutExt: "mp4",
+		OutExt: ".mp4",
 		ftp: &Ftp{
 			Addr:  "",
 			Login: "",
@@ -110,6 +111,44 @@ func TestFtp(t *testing.T) {
 	}()
 
 	time.Sleep(2 * time.Second)
+	cf()
+	time.Sleep(time.Second)
+	fmt.Printf("task: %+v\n", task)
+}
+
+func TestCmdStop(t *testing.T) {
+	var ctx, cf = context.WithCancel(context.TODO())
+	defer cf()
+	config.InitWithPath("config/config.json")
+	var store = store.NewRam[string, *Task](ctx)
+	var w = New(store)
+
+	var task = &Task{
+		ID:     "111",
+		InDir:  "/home/max/Загрузки/tmp",
+		OutDir: "/home/max/Загрузки/tmp_out",
+		Cmd:    "ffmpeg",
+		Args: []string{
+			"-i",
+			"{input}",
+			"-c:v",
+			"libx264",
+			"-b:v",
+			"500k",
+			"-c:a",
+			"copy",
+			"{output}",
+		},
+		Files:  []string{"111_0"},
+		OutExt: ".mp4",
+	}
+	go func() {
+		var err = w.executeTask(ctx, task)
+		fmt.Printf("err: %+v\n", err)
+	}()
+
+	time.Sleep(1 * time.Second)
+	w.StopProc("111")
 	cf()
 	time.Sleep(time.Second)
 	fmt.Printf("task: %+v\n", task)
