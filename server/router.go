@@ -18,6 +18,7 @@ type router[T any] struct {
 func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
 	log.Debug("Method: %s, Path: %s -> %s\n", req.Method, req.URL.Path, c.name)
 
+	w.Header().Set("Content-Type", "application/json")
 	var data, err = c.h(req)
 	if err != nil {
 		switch t := err.(type) {
@@ -50,7 +51,6 @@ func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(buffer)
 	if err != nil {
 		log.Error("%+v\n", errors.WithStack(err))
