@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"mediamagi.ru/win-file-agent/errors"
 	"mediamagi.ru/win-file-agent/ftp"
@@ -69,17 +70,13 @@ func executeTask(ctx context.Context, task *Task) error {
 
 		var args = make([]string, len(task.Args))
 		for idx, it := range task.Args {
-			if it == INPUT {
-				var filePath = filepath.Join(task.InDir, fileName)
-				args[idx] = filePath
-				continue
+			if strings.Contains(it, INPUT) {
+				it = strings.ReplaceAll(it, INPUT, filepath.Join(task.InDir, fileName))
 			}
-			if it == OUTPUT {
-				args[idx] = task.GetOutPath(fileName)
-				continue
+			if strings.Contains(it, OUTPUT) {
+				it = strings.ReplaceAll(it, OUTPUT, task.GetOutPath(fileName))
 			}
-
-			args[idx] = task.Args[idx]
+			args[idx] = it
 		}
 		fmt.Printf("args: %v\n", args)
 
