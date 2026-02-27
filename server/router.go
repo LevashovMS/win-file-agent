@@ -12,7 +12,7 @@ type routerAction[T any] func(*http.Request) (T, error)
 
 type router[T any] struct {
 	name string
-	h    routerAction[T]
+	h    routerAction[*T]
 }
 
 func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
@@ -28,18 +28,18 @@ func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(t.statusCode)
 			}
 			if t.innerErr != nil {
-				log.Error("%+v", err)
+				log.Error("%+v", t.innerErr)
 			}
 		default:
 			log.Error("%+v", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-
-		return
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
 
-	if any(data) == nil {
-		w.WriteHeader(http.StatusOK)
+	if data == nil {
 		return
 	}
 
@@ -51,7 +51,6 @@ func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(buffer)
 	if err != nil {
 		log.Error("%+v\n", errors.WithStack(err))

@@ -22,7 +22,7 @@ func Port(port int) ArgsHandler {
 	}
 }
 
-func Handler[T any](method, path string, h routerAction[T]) ArgsHandler {
+func Handler[T any](method, path string, h routerAction[*T]) ArgsHandler {
 	return func(o *server) {
 		var pc = reflect.ValueOf(h).Pointer()
 		var name = runtime.FuncForPC(pc).Name()

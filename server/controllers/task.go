@@ -26,8 +26,9 @@ func NewTask(store store.Store[string, *worker.Task], w *worker.Worker) *Task {
 }
 
 // Get, "/v1/task" - получение списка ключей всех заданий в работе
-func (c *Task) GetAll(req *http.Request) ([]string, error) {
-	return c.store.GetKeys(), nil
+func (c *Task) GetAll(req *http.Request) (*[]string, error) {
+	var ks = c.store.GetKeys()
+	return &ks, nil
 }
 
 // Get, "/v1/task/{id}" - получение задание и его статус.
@@ -45,41 +46,41 @@ func (c *Task) Get(req *http.Request) (*worker.Task, error) {
 }
 
 // Post, "/v1/task" - создание задания на обработку.
-func (c *Task) Create(req *http.Request) (string, error) {
+func (c *Task) Create(req *http.Request) (*string, error) {
 	defer req.Body.Close()
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		return "", server.StatusErr(http.StatusBadRequest, err)
+		return nil, server.StatusErr(http.StatusBadRequest, err)
 	}
 
 	var t = new(TaskReq)
 	if err = json.Unmarshal(bodyBytes, t); err != nil {
-		return "", errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 	if err = t.verification(); err != nil {
-		return "", server.StatusMsgErr(http.StatusBadRequest, err.Error(), err)
+		return nil, server.StatusMsgErr(http.StatusBadRequest, err.Error(), err)
 	}
 
 	fs, err := disk.GetFreeSpace(t.InDir)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 	if fs < oneGB {
-		return "", server.StatusCode(http.StatusInsufficientStorage)
+		return nil, server.StatusCode(http.StatusInsufficientStorage)
 	}
 
 	var tw = t.ToWTask()
 	if _, ok := c.store.Load(tw.ID); ok {
-		return "", server.StatusMsgErr(http.StatusConflict, fmt.Sprintf("Задача с таких hash %s в работе.", tw.ID), nil)
+		return nil, server.StatusMsgErr(http.StatusConflict, fmt.Sprintf("Задача с таких hash %s в работе.", tw.ID), nil)
 	}
 
 	c.w.ExecTask(tw)
 
-	return tw.ID, server.StatusCode(http.StatusCreated)
+	return &tw.ID, server.StatusCode(http.StatusCreated)
 }
 
 // Delete, "/v1/task/{id}" отмена задания. {id}
-func (c *Task) Delete(req *http.Request) (any, error) {
+func (c *Task) Delete(req *http.Request) (*any, error) {
 	var id = req.PathValue("id")
 	if len(id) == 0 {
 		return nil, server.StatusCode(http.StatusBadRequest)
