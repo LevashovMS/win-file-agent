@@ -73,7 +73,7 @@ func (c *Task) GetOutDir() string {
 	if len(c.OutDir) != 0 {
 		return c.OutDir
 	}
-	return config.Cfg.Load().TmpDir
+	return config.Load().TmpDir
 }
 
 func (c *Task) GetOutPath(fileName string) string {

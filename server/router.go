@@ -2,71 +2,59 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"reflect"
-	"runtime"
+
+	"mediamagi.ru/win-file-agent/errors"
+	"mediamagi.ru/win-file-agent/log"
 )
 
-type routerAction func(*http.Request) (any, error)
+type routerAction[T any] func(*http.Request) (T, error)
 
-type router struct {
-	mux *http.ServeMux
+type router[T any] struct {
+	name string
+	h    routerAction[*T]
 }
 
-func newRouter() *router {
-	return &router{
-		mux: http.NewServeMux(),
-	}
-}
+func (c *router[T]) generalHandler(w http.ResponseWriter, req *http.Request) {
+	log.Debug("Method: %s, Path: %s -> %s\n", req.Method, req.URL.Path, c.name)
 
-func (c *router) regHandler(method, path string, h routerAction) {
-	c.mux.HandleFunc(fmt.Sprintf("%s %s", method, path), (&routerExt{h: h}).generalHandler)
-}
-
-type routerExt struct {
-	h routerAction
-}
-
-func (c *routerExt) generalHandler(res http.ResponseWriter, req *http.Request) {
-	var pc = reflect.ValueOf(c.h).Pointer()
-	var name = runtime.FuncForPC(pc).Name()
-	log.Printf("Method: %s, Path: %s -> %s\n", req.Method, req.URL.Path, name)
-
+	w.Header().Set("Content-Type", "application/json")
 	var data, err = c.h(req)
 	if err != nil {
 		switch t := err.(type) {
-		case StatusCode:
-			res.WriteHeader(int(t))
-			if data == nil {
-				return
+		case *StCode:
+			if len(t.externalMsg) > 0 {
+				http.Error(w, t.externalMsg, t.statusCode)
+			} else {
+				w.WriteHeader(t.statusCode)
+			}
+			if t.innerErr != nil {
+				log.Error("%+v", t.innerErr)
 			}
 		default:
-			log.Printf("%+v\n", err)
-			res.WriteHeader(http.StatusInternalServerError)
+			log.Error("%+v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
 
 	if data == nil {
-		res.WriteHeader(http.StatusOK)
 		return
 	}
 
 	buffer, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("%+v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
+		log.Error("%+v", errors.WithStack(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-	_, err = res.Write(buffer)
+	_, err = w.Write(buffer)
 	if err != nil {
-		log.Printf("%+v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
+		log.Error("%+v\n", errors.WithStack(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }

@@ -5,12 +5,13 @@ package disk
 
 import (
 	"golang.org/x/sys/unix"
+	"mediamagi.ru/win-file-agent/errors"
 )
 
 func GetFreeSpace(path string) (uint64, error) {
 	var stat unix.Statfs_t
 	if err := unix.Statfs(path, &stat); err != nil {
-		return 0, err
+		return 0, errors.WithStack(err)
 	}
 
 	// Available blocks * size per block = available space in bytes

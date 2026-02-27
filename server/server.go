@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
+
+	"mediamagi.ru/win-file-agent/errors"
+	"mediamagi.ru/win-file-agent/log"
 )
 
 type Server interface {
@@ -14,15 +16,15 @@ type Server interface {
 }
 
 type server struct {
-	ctx    context.Context // общий контекст
-	cf     context.CancelFunc
-	srv    *http.Server // HTTP‑сервер
-	port   int
-	router *router
+	ctx  context.Context // общий контекст
+	cf   context.CancelFunc
+	srv  *http.Server // HTTP‑сервер
+	port int
+	mux  *http.ServeMux
 }
 
 func New(args ...ArgsHandler) Server {
-	var s = &server{router: newRouter()}
+	var s = &server{mux: http.NewServeMux()}
 	for _, it := range args {
 		it(s)
 	}
@@ -40,7 +42,7 @@ func (c *server) Run(ctx context.Context) (err error) {
 	// 1) Запускаем HTTP‑сервер
 	c.srv = &http.Server{
 		Addr:              addrPort,
-		Handler:           c.router.mux,
+		Handler:           c.mux,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
@@ -54,7 +56,7 @@ func (c *server) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	log.Printf("Запуск сервера с адресом: %s\n", addrPort)
+	log.Info("Запуск сервера с адресом: %s\n", addrPort)
 	return nil
 }
 
@@ -63,6 +65,6 @@ func (c *server) Stop() {
 	var ctx, cf = context.WithTimeout(context.Background(), 15*time.Second)
 	defer cf()
 	if err := c.srv.Shutdown(ctx); err != nil {
-		log.Printf("HTTP shutdown error: %v", err)
+		log.Error("HTTP shutdown error: %+v", errors.WithStack(err))
 	}
 }

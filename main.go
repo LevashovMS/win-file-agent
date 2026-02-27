@@ -43,7 +43,7 @@ func main() {
 	}
 
 	log1.Init(ctx, "")
-	config.Init()
+	config.InitFromFile()
 
 	var ag = agent.New(ctx)
 	if err := ag.Start(ctx); err != nil {

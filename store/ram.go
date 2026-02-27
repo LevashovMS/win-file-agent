@@ -2,11 +2,12 @@ package store
 
 import (
 	"context"
-	"log"
 	"maps"
 	"slices"
 	"sync"
 	"time"
+
+	"mediamagi.ru/win-file-agent/log"
 )
 
 type ram[K comparable, V any] struct {
@@ -75,7 +76,7 @@ func (c *ram[K, V]) timersStop(ctx context.Context) {
 	<-ctx.Done()
 	c.lock.Lock()
 	for key, v := range c.timers {
-		log.Printf("Timer stop: %v\n", key)
+		log.Debug("Timer stop: %v\n", key)
 		v.Stop()
 	}
 	c.data = make(map[K]V)
@@ -85,7 +86,7 @@ func (c *ram[K, V]) timersStop(ctx context.Context) {
 }
 
 func (c *ram[K, V]) handler(key K) {
-	log.Printf("Ожидание завершено по ключу: %v\n", key)
+	log.Debug("Ожидание завершено по ключу: %v\n", key)
 	c.lock.Lock()
 	var _, ok = c.data[key]
 	if ok {

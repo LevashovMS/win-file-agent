@@ -5,13 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 
 	"mediamagi.ru/win-file-agent/config"
+	"mediamagi.ru/win-file-agent/errors"
+	"mediamagi.ru/win-file-agent/log"
 	"mediamagi.ru/win-file-agent/worker"
 )
 
@@ -56,7 +56,7 @@ func (c *TaskReq) verification() error {
 			msg = append(msg, "Не задана исходящая папка")
 			msg = append(msg, "Не заданы настройки ftp")
 		}
-		if len(config.Cfg.Load().TmpDir) == 0 {
+		if len(config.Load().TmpDir) == 0 {
 			msg = append(msg, "Не задано в настройках сервиса временное хранение файлов")
 		}
 		if len(c.Ftp.Addr) == 0 {
@@ -82,7 +82,7 @@ func (c *TaskReq) verification() error {
 	}
 
 	if len(msg) > 0 {
-		return errors.New(strings.Join(msg, " "))
+		return errors.New(strings.Join(msg, "\n"))
 	}
 
 	if len(c.OutExt) > 0 && c.OutExt[0] != '.' {
@@ -99,7 +99,7 @@ func (c *TaskReq) getID() string {
 
 	var b bytes.Buffer
 	if err := gob.NewEncoder(&b).Encode(c); err != nil {
-		log.Printf("Обшибка создания ID, %+v", err)
+		log.Error("Обшибка создания ID, %+v", errors.WithStack(err))
 		return ""
 	}
 
