@@ -36,7 +36,7 @@ function get_state_string() {
 # Принимает:
 # длинну массива
 # массив
-# состояние отслеживания
+# task_id для возврата
 function req_post() {
     local array_len="$1"
     shift
@@ -44,8 +44,7 @@ function req_post() {
     local arr=("${@:1:$array_len}")
     shift "$((array_len))"
 
-    local stop_state="$1"
-
+    local -n ref_task_id=$1
     local formatted_string=''
     local first=true
 
@@ -65,7 +64,7 @@ function req_post() {
     echo $post_data
 
     local url=$URL'/'$TASK
-    echo $url
+    #echo $url
     sleep 1
 
     local tmpfile=$(mktemp)
@@ -74,15 +73,18 @@ function req_post() {
     local body=$(cat "$tmpfile")
     rm "$tmpfile" # Clean up the temporary file
 
-    echo "Status Code: $status_code"
-    echo "Response Body: $body"
+    #echo "Status Code: $status_code"
+    #echo "Response Body: $body"
 
     if [ $status_code -eq 201 ]; then
-        trimmed=$(echo "$body" | tr -d '"')
-        tracking $trimmed $stop_state
-        return $?
+        ref_task_id=$(echo "$body" | tr -d '"')
+        #tracking $trimmed $stop_state
+        #return $?
+        echo $ref_task_id
+        return 0
     else
         echo "Не получилось создать задачу на обработку $status_code"
+        return -1
     fi
 }
 
@@ -116,7 +118,6 @@ function req_get() {
             echo -n "Files:           "; echo $body | jq -r '.files | join(", ")'
             echo -n "State:           "; get_state_string $state
             echo -n "Msg:             "; echo $body | jq -r '.msg'
-            echo -n "Ftp:             "; echo $body | jq -r '.ftp[0]'
         fi
 
         return $state
@@ -167,7 +168,9 @@ function read_file() {
             array+=($line)
             if [ $((idx % FILE_COUNT)) -eq 0 ]; then
                 #echo "$array"
-                req_post "${#array[@]}" "${array[@]}" &
+                local task_id=""
+                req_post "${#array[@]}" "${array[@]}" task_id
+                tracking $task_id -1 &
                 tasks=$((tasks+1))
                 array=()
             fi
@@ -198,7 +201,11 @@ function test_download_exec_ftp() {
 function test_stoping() {
     local url=$1
     local stop_state=$2
-    req_post 1 $url $stop_state
+    local task_id=""
+    req_post 1 $url task_id
+    tracking $task_id $stop_state
+    req_delete $task_id
+    tracking $task_id
 }
 
 if [[ ${#LOGIN} -eq 0 || ${#PASS} -eq 0 ]]; then
@@ -208,13 +215,11 @@ fi
 
 #tracking "f5526c0c457337e5835672cac83c535c87ef192c2046f922e8e89f85f70a7627"
 #req_delete "f5526c0c457337e5835672cac83c535c87ef192c2046f922e8e89f85f70a7627"
-#my_array=("apple" "banana" "cherry")
-#req_post $my_array
 
 #test scripts
-test_stoping "https://storage007.noisypeak.com/mastervod/cs/CelebrityScene01032025.mp4" 1
+#test_stoping "https://storage007.noisypeak.com/mastervod/cs/CelebrityScene01032025.mp4" 1
 #test_stoping "https://storage007.noisypeak.com/mastervod/cs/CelebrityScene01032025.mp4" 2
 #test_stoping "https://storage007.noisypeak.com/mastervod/cs/CelebrityScene01032025.mp4" 3
-#test_download_exec_ftp
+test_download_exec_ftp
 
 echo "Все задачи завершены"
