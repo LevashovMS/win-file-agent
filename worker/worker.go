@@ -115,9 +115,7 @@ func (c *Worker) workerLoop(ctx context.Context) {
 				var handlers = map[StateCode]workerHandler{
 					DOWNLOAD: downloadFiles,
 					PROCESS:  executeTask,
-				}
-				if task.saveToFtp {
-					handlers[SAVING] = ftpStore
+					SAVING:   ftpStore,
 				}
 				for state, handler := range handlers {
 					c.setState(task.ID, state)

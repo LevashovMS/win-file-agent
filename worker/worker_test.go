@@ -30,12 +30,12 @@ func TestWorker(t *testing.T) {
 		for {
 			time.Sleep(1 * time.Second)
 			if t, ok := w.store.Load(task.ID); ok {
-				if t.State == PROCESS {
-					if _, err := w.StopProc(task.ID); err != nil {
-						fmt.Printf("%+v\n", err)
-					}
-					return
-				}
+				//if t.State == PROCESS {
+				//	if _, err := w.StopProc(task.ID); err != nil {
+				//		fmt.Printf("%+v\n", err)
+				//	}
+				//	return
+				//}
 				if t.State == FINISH || t.State == ERROR {
 					return
 				}
