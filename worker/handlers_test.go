@@ -39,8 +39,8 @@ func TestExec(t *testing.T) {
 		fmt.Printf("%s\n", err)
 	}()
 
-	time.Sleep(2 * time.Second)
-	cf()
+	//time.Sleep(2 * time.Second)
+	//cf()
 	time.Sleep(time.Second)
 	fmt.Printf("task: %+v\n", task)
 }

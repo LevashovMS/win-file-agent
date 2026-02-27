@@ -63,16 +63,16 @@ func defaultTask() *Task {
 		Cmd: "ffmpeg",
 		Args: []string{
 			"-i",
-			"{input}",
+			"2_{input}  123123",
 			"-c:v",
 			"libx264",
 			"-b:v",
 			"500k",
 			"-c:a",
 			"copy",
-			"{output}",
+			"1_{output}_1",
 		},
-		//Files:  []string{"111_0"},
+		Files:  []string{"111222_0"},
 		OutExt: ".mp4",
 	}
 }
