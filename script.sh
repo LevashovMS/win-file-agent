@@ -1,6 +1,10 @@
 #!/bin/bash
+# REQ_DATA это формат данных с тремя не известными:
+# \"urls\":[%s] - собираются из файла переменной CSV
+# \"login\":\"%s\",\"pass\":\"%s\" - логин и пароль для подключения к ftp, передаются как два первых параметра в скрипте при запуске
 
 # params
+# ссылка на сервис + версия
 URL="http://91.220.62.199:8080/v1"
 REQ_DATA='{\"in_dir\":\"C:\\\\Users\\\\Administrator\\\\Downloads\\\\InDir\",\"urls\":[%s],\"cmd\":\"ffmpeg.exe\",\"args\":[\"-i\",\"{input}\",\"-c:v\",\"copy\",\"-c:a\",\"aac\",\"-b:a\",\"64k\",\"{output}\"],\"out_ext\":\"mp4\",\"ftp\":{\"addr\":\"storage007.noisypeak.com:21\",\"login\":\"%s\",\"pass\":\"%s\"}}'
 CSV="CS100files.txt"
@@ -10,11 +14,21 @@ FILE_COUNT=2
 # controllers
 TASK="task"
 
-echo "Начало"
-
 #arguments
 LOGIN=$1
 PASS=$2
+
+function get_state_string() {
+    case "$1" in
+        0   ) echo "CREATE";;
+        1   ) echo "DOWNLOAD";;
+        2   ) echo "PROCESS";;
+        3   ) echo "SAVING";;
+        4   ) echo "CANCEL";;
+        5   ) echo "FINISH";;
+        127   ) echo "ERROR";;
+    esac
+}
 
 function req_post() {
     local arr=("$@")
@@ -61,30 +75,42 @@ function req_get() {
     local url=$URL'/'$TASK'/'$1
     local tmpfile2=$(mktemp)
     local cur_state=0
-    echo $url
+    echo "Отслеживание $url"; echo ""
 
     while true; do
         # Run curl, writing the body to a temporary file and the status code to stdout
         local status_code=$(curl -s -w "%{http_code}" -o "$tmpfile2" "$url")
         local body=$(cat "$tmpfile2")
         rm "$tmpfile2" # Clean up the temporary file
-        echo "Status Code: $status_code"
+        #echo "Status Code: $status_code"
 
         if [ $status_code -eq 200 ]; then
-            echo "Response Body: $body"
+            #echo "Response Body: $body"
             if [ ${#body} -eq 0 ]; then
                 echo "Нет данных по ключу $1"
                 return
             fi
 
             state=$(echo $body | grep -oP '"state":.+?,' | grep -Po '\d+')
-            echo "state $state"
+            #echo "state $state"
             if [ $state -ne $cur_state ]; then
                 cur_state=$state
-                echo "Смена состояния $cur_state key $1"
+                echo -n "-= "; echo -n "$(get_state_string $cur_state)"; echo " $1 =-"
+
+                echo -n "ID:              "; echo $body | jq -r '.id'
+                echo -n "InDir:           "; echo $body | jq -r '.in_dir'
+                echo -n "OutDir:          "; echo $body | jq -r '.out_dir'
+                echo -n "URLS:            "; echo $body | jq -r '.urls | join(", ")'
+                echo -n "Cmd:             "; echo $body | jq -r '.cmd'
+                echo -n "Args:            "; echo $body | jq -r '.args | join(", ")'
+                echo -n "OutExt:          "; echo $body | jq -r '.out_ext'
+                echo -n "Files:           "; echo $body | jq -r '.files | join(", ")'
+                echo -n "State:           "; get_state_string $cur_state
+                echo -n "Msg:             "; echo $body | jq -r '.msg'
+                echo -n "Ftp:             "; echo $body | jq -r '.ftp[0]'
             fi
             if [[ $state -eq 127 || $state -eq 5 ]]; then
-                echo "Отслеживание завершено $state key $1"
+                echo "Отслеживание завершено $(get_state_string $state) $1"
                 return
             fi
             continue
@@ -139,10 +165,10 @@ if [[ ${#LOGIN} -eq 0 || ${#PASS} -eq 0 ]]; then
     return
 fi
 
-#req_get "e749f52c9eae282e5f7eb87bdc02a7b5a2d7dabfcc3cad59c6adc130b13d9031"
+req_get "f5526c0c457337e5835672cac83c535c87ef192c2046f922e8e89f85f70a7627"
 #my_array=("apple" "banana" "cherry")
 #req_post $my_array
 
-main
+#main
 
 echo "Все задачи завершены"
